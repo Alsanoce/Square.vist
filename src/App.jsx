@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import DonateForm from "./pages/Donate";
 import OtpConfirmationPage from "./pages/OtpConfirmationPage";
+import ThankYou from "./pages/ThankYou"; // ← تم إضافته
 
 function App() {
   return (
