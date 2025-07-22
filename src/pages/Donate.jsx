@@ -14,15 +14,12 @@ function DonateForm() {
   useEffect(() => {
     const fetchMosques = async () => {
       try {
-        const res = await fetch(
-          "https://firestore.googleapis.com/v1/projects/whater-f15d4/databases/(default)/documents/mosques"
-        );
+        const res = await fetch("https://firestore.googleapis.com/v1/projects/whater-f15d4/databases/(default)/documents/mosques");
         const data = await res.json();
-        const mosquesList =
-          data.documents?.map((doc) => ({
-            id: doc.name.split("/").pop(),
-            name: doc.fields.name.stringValue,
-          })) || [];
+        const mosquesList = data.documents?.map((doc) => ({
+          id: doc.name.split("/").pop(),
+          name: doc.fields.name.stringValue,
+        })) || [];
         setMosques(mosquesList);
       } catch (error) {
         console.error("فشل في جلب المساجد:", error);
@@ -36,13 +33,28 @@ function DonateForm() {
     return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d).toString());
   };
 
+  const validateInputs = () => {
+    const cleaned = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
+    const phoneRegex = /^9\d{8}$/;
+    if (!selectedMosque || !cleaned || quantity < 1) {
+      setStatus("❗ الرجاء تعبئة جميع الحقول بشكل صحيح");
+      return false;
+    }
+    if (!phoneRegex.test(cleaned)) {
+      setStatus("❗ رقم الهاتف غير صالح (يجب أن يبدأ بـ9 ويحتوي على 9 أرقام)");
+      return false;
+    }
+    if (quantity < 1 || quantity > 50) {
+      setStatus("❗ العدد يجب أن يكون بين 1 و50");
+      return false;
+    }
+    return true;
+  };
+
   const handleDonate = async () => {
     const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
 
-    if (!selectedMosque || !cleanedPhone || quantity < 1) {
-      setStatus("❗ الرجاء تعبئة جميع الحقول بشكل صحيح");
-      return;
-    }
+    if (!validateInputs()) return;
 
     try {
       const res = await axios.post("https://saniah-api.onrender.com/pay", {
@@ -50,20 +62,22 @@ function DonateForm() {
         quantity: quantity,
       });
 
-      localStorage.setItem(
-        "donation_data",
-        JSON.stringify({
-          phone: cleanedPhone,
-          quantity,
-          mosque: selectedMosque,
-          sessionID: res.data?.sessionID || null,
-        })
-      );
+      if (!res.data.sessionID) {
+        setStatus("❌ لم يتم العثور على الرقم في النظام المصرفي");
+        return;
+      }
+
+      localStorage.setItem("donation_data", JSON.stringify({
+        phone: cleanedPhone,
+        quantity,
+        mosque: selectedMosque,
+        sessionID: res.data.sessionID,
+      }));
 
       navigate("/confirm");
     } catch (err) {
       console.error(err);
-      setStatus("❌ فشل الاتصال بالخادم");
+      setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
     }
   };
 
@@ -86,7 +100,7 @@ function DonateForm() {
 
       <input
         type="tel"
-        placeholder="رقم الهاتف (مثال: 926388438)"
+        placeholder="رقم الهاتف (مثال: 92******)"
         className="border p-2 w-full"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
@@ -95,6 +109,7 @@ function DonateForm() {
       <input
         type="number"
         min={1}
+        max={50}
         className="border p-2 w-full"
         value={quantity}
         onChange={(e) => setQuantity(Number(e.target.value))}
@@ -107,7 +122,7 @@ function DonateForm() {
         تبرع الآن
       </button>
 
-      {status && <div className="mt-2 text-center">{status}</div>}
+      {status && <div className="mt-2 text-center text-red-600">{status}</div>}
     </div>
   );
 }
