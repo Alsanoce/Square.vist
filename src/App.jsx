@@ -7,6 +7,7 @@ function App() {
     <Routes>
       <Route path="/" element={<DonateForm />} />
       <Route path="/confirm" element={<OtpConfirmationPage />} />
+      <Route path="/thank-you" element={<ThankYou />} />
     </Routes>
   );
 }
