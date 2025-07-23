@@ -82,47 +82,49 @@ function DonateForm() {
   };
 
   return (
-    <div className="p-4 space-y-4 max-w-md mx-auto">
-      <h2 className="text-xl font-bold">تبرع بالأستيكة</h2>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center text-green-700 mb-4">ساهم في سقيا المساجد</h1>
 
-      <select
-        className="border p-2 w-full"
-        value={selectedMosque}
-        onChange={(e) => setSelectedMosque(e.target.value)}
-      >
-        <option value="">اختر المسجد</option>
-        {mosques.map((m) => (
-          <option key={m.id} value={m.name}>
-            {m.name}
-          </option>
-        ))}
-      </select>
+        <select
+          className="border p-2 w-full rounded mb-3"
+          value={selectedMosque}
+          onChange={(e) => setSelectedMosque(e.target.value)}
+        >
+          <option value="">اختر المسجد</option>
+          {mosques.map((m) => (
+            <option key={m.id} value={m.name}>
+              {m.name}
+            </option>
+          ))}
+        </select>
 
-      <input
-        type="tel"
-        placeholder="رقم الهاتف (مثال: 92******)"
-        className="border p-2 w-full"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-      />
+        <input
+          type="tel"
+          placeholder="رقم الهاتف (مثال: 92xxxxxxx)"
+          className="border p-2 w-full rounded mb-3"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
 
-      <input
-        type="number"
-        min={1}
-        max={50}
-        className="border p-2 w-full"
-        value={quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-      />
+        <input
+          type="number"
+          min={1}
+          max={50}
+          className="border p-2 w-full rounded mb-4"
+          value={quantity}
+          onChange={(e) => setQuantity(Number(e.target.value))}
+        />
 
-      <button
-        onClick={handleDonate}
-        className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-      >
-        تبرع الآن
-      </button>
+        <button
+          onClick={handleDonate}
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded w-full"
+        >
+          تبرع الآن
+        </button>
 
-      {status && <div className="mt-2 text-center text-red-600">{status}</div>}
+        {status && <div className="mt-4 text-center text-red-600">{status}</div>}
+      </div>
     </div>
   );
 }
