@@ -45,7 +45,7 @@ function DonateForm() {
       return false;
     }
     if (quantity < 1 || quantity > 50) {
-      setStatus("❗ العدد يجب أن يكون بين 1 و50");
+      setStatus("❗ العدد يجب أن يكون بين 2 و50");
       return false;
     }
     return true;
