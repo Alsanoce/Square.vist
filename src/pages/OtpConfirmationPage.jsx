@@ -39,7 +39,7 @@ function OtpConfirmationPage() {
     }
 
     try {
-      const res = await axios.post("https://saniah-api.onrender.com/confirm", {
+      const res = await axios.post("http://102.213.181.158:3000/confirm", {
         otp,
         phone: donationData.phone,
         quantity: donationData.quantity,
