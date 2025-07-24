@@ -57,7 +57,7 @@ function DonateForm() {
     if (!validateInputs()) return;
 
     try {
-      const res = await axios.post("https://saniah-api.onrender.com/pay", {
+      const res = await axios.post("http://102.213.181.158:3000/pay", {
         customer: cleanedPhone,
         quantity: quantity,
       });
