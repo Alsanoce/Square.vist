@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Donate from "./pages/Donate";
-import Confirm from "./pages/Confirm";
+import Confirm from "./pages/OtpConfirmationPage.jsx";
 import ThankYou from "./pages/ThankYou";
 import About from "./pages/About";
 
@@ -13,7 +13,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/donate" element={<Donate />} />
-        <Route path="/confirm" element={<Confirm />} />
+        <Route path="/OtpConfirmationPage.jsx" element={<OtpConfirmationPage.jsx />} />
         <Route path="/thank-you" element={<ThankYou />} />
         <Route path="/about" element={<About />} />
       </Routes>
