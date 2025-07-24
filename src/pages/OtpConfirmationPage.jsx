@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 function OtpConfirmationPage() {
   const [otp, setOtp] = useState("");
   const [status, setStatus] = useState(null);
   const [donationData, setDonationData] = useState(null);
-   const navigate = useNavigate();
+  const navigate = useNavigate(); // ✅ لتوجيه المستخدم
 
   useEffect(() => {
     const data = localStorage.getItem("donation_data");
@@ -53,7 +53,7 @@ function OtpConfirmationPage() {
         await saveDonation(donationData);
         setStatus("✅ تم الدفع بنجاح");
         localStorage.removeItem("donation_data");
-          navigate("/thank-you");
+        navigate("/thank-you"); // ✅ التوجيه بعد النجاح
       } else {
         setStatus(res.data.message || "❌ حدث خطأ أثناء تأكيد الدفع");
       }
