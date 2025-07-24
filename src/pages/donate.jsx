@@ -1,90 +1,98 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-function OtpConfirmationPage() {
-  const [otp, setOtp] = useState("");
+function Donate() {
+  const [phone, setPhone] = useState("");
+  const [mosque, setMosque] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const [status, setStatus] = useState(null);
-  const [donationData, setDonationData] = useState(null);
-  const navigate = useNavigate(); // ✅ لتوجيه المستخدم
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    const data = localStorage.getItem("donation_data");
-    if (data) {
-      setDonationData(JSON.parse(data));
-    }
-  }, []);
-
-  const saveDonation = async ({ phone, quantity, mosque, sessionID }) => {
-    try {
-      await addDoc(collection(db, "transactions"), {
-        customer: phone,
-        amount: quantity,
-        mosqueName: mosque,
-        sessionID,
-        status: "confirmed",
-        timestamp: new Date().toISOString(),
-        deliveryStatus: "بانتظار التوصيل"
-      });
-      console.log("✅ تم تسجيل التبرع في Firestore");
-    } catch (error) {
-      console.error("❌ فشل في التسجيل:", error);
-    }
-  };
-
-  const handleConfirm = async () => {
-    if (!otp || !donationData?.sessionID) {
-      setStatus("❌ البيانات غير مكتملة أو الكود غير مدخل");
+  const handleDonate = async () => {
+    if (!phone || !mosque || !quantity) {
+      setStatus("❌ يرجى تعبئة جميع الحقول");
       return;
     }
 
     try {
-      const res = await axios.post("https://api.saniah.ly/confirm", {
-        otp,
-        phone: donationData.phone,
-        quantity: donationData.quantity,
-        mosque: donationData.mosque,
-        sessionID: donationData.sessionID,
+      const res = await axios.post("https://api.saniah.ly/pay", {
+        phone,
+        quantity,
+        mosque,
       });
 
-      if (res.data.success) {
-        await saveDonation(donationData);
-        setStatus("✅ تم الدفع بنجاح");
-        localStorage.removeItem("donation_data");
-        navigate("/thank-you"); // ✅ التوجيه بعد النجاح
+      const data = res.data;
+
+      if (data.status === "OTP_SENT" && data.sessionID) {
+        localStorage.setItem(
+          "donation_data",
+          JSON.stringify({
+            phone,
+            mosque,
+            quantity,
+            sessionID: data.sessionID,
+          })
+        );
+        navigate("/confirm");
+      } else if (data.status === "PW1") {
+        setStatus("❌ كلمة المرور خاطئة (PW1)");
+      } else if (data.status === "PW") {
+        setStatus("❌ كود التاجر (PIN) غير صحيح (PW)");
+      } else if (data.status === "Limit") {
+        setStatus("❌ القيمة المطلوبة تتجاوز الحد المسموح به (Limit)");
+      } else if (data.status === "ACC") {
+        setStatus("❌ رقم الزبون غير موجود في النظام البنكي (ACC)");
+      } else if (data.status === "Bal") {
+        setStatus("❌ الرصيد غير كافي (Bal)");
       } else {
-        setStatus(res.data.message || "❌ حدث خطأ أثناء تأكيد الدفع");
+        setStatus(data.message || "❌ حدث خطأ غير معروف أثناء الدفع");
       }
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ فشل في الاتصال بالخادم");
+    } catch (error) {
+      console.error("❌ فشل في الاتصال بالسيرفر:", error);
+      setStatus("❌ تعذر الاتصال بالسيرفر");
     }
   };
 
   return (
     <div className="p-4 max-w-md mx-auto text-center">
-      <h2 className="text-xl font-bold mb-4">أدخل كود OTP</h2>
+      <h2 className="text-xl font-bold mb-4">تبرع الآن</h2>
 
       <input
         type="text"
-        maxLength={4}
-        className="border p-2 w-full mb-2 text-center"
-        value={otp}
-        onChange={(e) => setOtp(e.target.value)}
+        placeholder="رقم الهاتف"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        className="border p-2 w-full mb-2"
+      />
+
+      <input
+        type="text"
+        placeholder="اسم المسجد"
+        value={mosque}
+        onChange={(e) => setMosque(e.target.value)}
+        className="border p-2 w-full mb-2"
+      />
+
+      <input
+        type="number"
+        min={1}
+        placeholder="عدد الأستيكات"
+        value={quantity}
+        onChange={(e) => setQuantity(Number(e.target.value))}
+        className="border p-2 w-full mb-2"
       />
 
       <button
-        onClick={handleConfirm}
-        className="bg-green-600 text-white px-4 py-2 rounded w-full"
+        onClick={handleDonate}
+        className="bg-blue-600 text-white px-4 py-2 rounded w-full"
       >
-        تأكيد الدفع
+        تأكيد التبرع
       </button>
 
-      {status && <div className="mt-4">{status}</div>}
+      {status && <div className="mt-4 text-red-600">{status}</div>}
     </div>
   );
 }
 
-export default OtpConfirmationPage;
+export default Donate;
