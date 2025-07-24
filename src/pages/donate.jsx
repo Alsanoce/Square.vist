@@ -1,132 +1,90 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
-function DonateForm() {
-  const [phone, setPhone] = useState("");
-  const [quantity, setQuantity] = useState(1);
+function OtpConfirmationPage() {
+  const [otp, setOtp] = useState("");
   const [status, setStatus] = useState(null);
-  const [mosques, setMosques] = useState([]);
-  const [selectedMosque, setSelectedMosque] = useState("");
-
-  const navigate = useNavigate();
+  const [donationData, setDonationData] = useState(null);
+  const navigate = useNavigate(); // ✅ لتوجيه المستخدم
 
   useEffect(() => {
-    const fetchMosques = async () => {
-      try {
-        const res = await fetch("https://firestore.googleapis.com/v1/projects/whater-f15d4/databases/(default)/documents/mosques");
-        const data = await res.json();
-        const mosquesList = data.documents?.map((doc) => ({
-          id: doc.name.split("/").pop(),
-          name: doc.fields.name.stringValue,
-        })) || [];
-        setMosques(mosquesList);
-      } catch (error) {
-        console.error("فشل في جلب المساجد:", error);
-      }
-    };
-    fetchMosques();
+    const data = localStorage.getItem("donation_data");
+    if (data) {
+      setDonationData(JSON.parse(data));
+    }
   }, []);
 
-  const convertToEnglishDigits = (input) => {
-    const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
-    return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d).toString());
+  const saveDonation = async ({ phone, quantity, mosque, sessionID }) => {
+    try {
+      await addDoc(collection(db, "transactions"), {
+        customer: phone,
+        amount: quantity,
+        mosqueName: mosque,
+        sessionID,
+        status: "confirmed",
+        timestamp: new Date().toISOString(),
+        deliveryStatus: "بانتظار التوصيل"
+      });
+      console.log("✅ تم تسجيل التبرع في Firestore");
+    } catch (error) {
+      console.error("❌ فشل في التسجيل:", error);
+    }
   };
 
-  const validateInputs = () => {
-    const cleaned = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
-    const phoneRegex = /^9\d{8}$/;
-    if (!selectedMosque || !cleaned || quantity < 1) {
-      setStatus("❗ الرجاء تعبئة جميع الحقول بشكل صحيح");
-      return false;
+  const handleConfirm = async () => {
+    if (!otp || !donationData?.sessionID) {
+      setStatus("❌ البيانات غير مكتملة أو الكود غير مدخل");
+      return;
     }
-    if (!phoneRegex.test(cleaned)) {
-      setStatus("❗ رقم الهاتف غير صالح (يجب أن يبدأ بـ9 ويحتوي على 9 أرقام)");
-      return false;
-    }
-    if (quantity < 1 || quantity > 50) {
-      setStatus("❗ العدد يجب أن يكون بين 2 و50");
-      return false;
-    }
-    return true;
-  };
-
-  const handleDonate = async () => {
-    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
-
-    if (!validateInputs()) return;
 
     try {
-      const res = await axios.post("https://api.saniah.ly/pay", {
-        customer: cleanedPhone,
-        quantity: quantity,
+      const res = await axios.post("https://api.saniah.ly/confirm", {
+        otp,
+        phone: donationData.phone,
+        quantity: donationData.quantity,
+        mosque: donationData.mosque,
+        sessionID: donationData.sessionID,
       });
 
-      if (!res.data.sessionID) {
-        setStatus("❌ لم يتم العثور على الرقم في النظام المصرفي");
-        return;
+      if (res.data.success) {
+        await saveDonation(donationData);
+        setStatus("✅ تم الدفع بنجاح");
+        localStorage.removeItem("donation_data");
+        navigate("/thank-you"); // ✅ التوجيه بعد النجاح
+      } else {
+        setStatus(res.data.message || "❌ حدث خطأ أثناء تأكيد الدفع");
       }
-
-      localStorage.setItem("donation_data", JSON.stringify({
-        phone: cleanedPhone,
-        quantity,
-        mosque: selectedMosque,
-        sessionID: res.data.sessionID,
-      }));
-
-      navigate("/confirm");
     } catch (err) {
       console.error(err);
-      setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
+      setStatus("❌ فشل في الاتصال بالخادم");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center text-green-700 mb-4">ساهم في سقيا المساجد</h1>
+    <div className="p-4 max-w-md mx-auto text-center">
+      <h2 className="text-xl font-bold mb-4">أدخل كود OTP</h2>
 
-        <select
-          className="border p-2 w-full rounded mb-3"
-          value={selectedMosque}
-          onChange={(e) => setSelectedMosque(e.target.value)}
-        >
-          <option value="">اختر المسجد</option>
-          {mosques.map((m) => (
-            <option key={m.id} value={m.name}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+      <input
+        type="text"
+        maxLength={4}
+        className="border p-2 w-full mb-2 text-center"
+        value={otp}
+        onChange={(e) => setOtp(e.target.value)}
+      />
 
-        <input
-          type="tel"
-          placeholder="رقم الهاتف (مثال: 92xxxxxxx)"
-          className="border p-2 w-full rounded mb-3"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
+      <button
+        onClick={handleConfirm}
+        className="bg-green-600 text-white px-4 py-2 rounded w-full"
+      >
+        تأكيد الدفع
+      </button>
 
-        <input
-          type="number"
-          min={1}
-          max={50}
-          className="border p-2 w-full rounded mb-4"
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-        />
-
-        <button
-          onClick={handleDonate}
-          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded w-full"
-        >
-          تبرع الآن
-        </button>
-
-        {status && <div className="mt-4 text-center text-red-600">{status}</div>}
-      </div>
+      {status && <div className="mt-4">{status}</div>}
     </div>
   );
 }
 
-export default DonateForm;
+export default OtpConfirmationPage;
