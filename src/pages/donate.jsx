@@ -1,98 +1,92 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useState, useEffect } from "react"; import { useNavigate } from "react-router-dom"; import { collection, getDocs } from "firebase/firestore"; import { db } from "../firebase"; import axios from "axios";
 
-function Donate() {
-  const [phone, setPhone] = useState("");
-  const [mosque, setMosque] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [status, setStatus] = useState(null);
-  const navigate = useNavigate();
+function DonateForm() { const [phone, setPhone] = useState(""); const [quantity, setQuantity] = useState(1); const [status, setStatus] = useState(null); const [mosques, setMosques] = useState([]); const [selectedMosque, setSelectedMosque] = useState("");
 
-  const handleDonate = async () => {
-    if (!phone || !mosque || !quantity) {
-      setStatus("❌ يرجى تعبئة جميع الحقول");
-      return;
-    }
+const navigate = useNavigate();
 
-    try {
-      const res = await axios.post("https://api.saniah.ly/pay", {
-        phone,
-        quantity,
-        mosque,
-      });
+useEffect(() => { const fetchMosques = async () => { try { const snapshot = await getDocs(collection(db, "mosques")); const mosquesList = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, })); setMosques(mosquesList); } catch (error) { console.error("فشل في جلب المساجد من Firebase:", error); } };
 
-      const data = res.data;
+fetchMosques();
 
-      if (data.status === "OTP_SENT" && data.sessionID) {
-        localStorage.setItem(
-          "donation_data",
-          JSON.stringify({
-            phone,
-            mosque,
-            quantity,
-            sessionID: data.sessionID,
-          })
-        );
-        navigate("/confirm");
-      } else if (data.status === "PW1") {
-        setStatus("❌ كلمة المرور خاطئة (PW1)");
-      } else if (data.status === "PW") {
-        setStatus("❌ كود التاجر (PIN) غير صحيح (PW)");
-      } else if (data.status === "Limit") {
-        setStatus("❌ القيمة المطلوبة تتجاوز الحد المسموح به (Limit)");
-      } else if (data.status === "ACC") {
-        setStatus("❌ رقم الزبون غير موجود في النظام البنكي (ACC)");
-      } else if (data.status === "Bal") {
-        setStatus("❌ الرصيد غير كافي (Bal)");
-      } else {
-        setStatus(data.message || "❌ حدث خطأ غير معروف أثناء الدفع");
-      }
-    } catch (error) {
-      console.error("❌ فشل في الاتصال بالسيرفر:", error);
-      setStatus("❌ تعذر الاتصال بالسيرفر");
-    }
-  };
+}, []);
 
-  return (
-    <div className="p-4 max-w-md mx-auto text-center">
-      <h2 className="text-xl font-bold mb-4">تبرع الآن</h2>
+const convertToEnglishDigits = (input) => { const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]; return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d).toString()); };
 
-      <input
-        type="text"
-        placeholder="رقم الهاتف"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        className="border p-2 w-full mb-2"
-      />
+const validateInputs = () => { const cleaned = convertToEnglishDigits(phone.trim().replace(/\s/g, "")); const phoneRegex = /^9\d{8}$/; if (!selectedMosque || !cleaned || quantity < 1) { setStatus("❗ الرجاء تعبئة جميع الحقول بشكل صحيح"); return false; } if (!phoneRegex.test(cleaned)) { setStatus("❗ رقم الهاتف غير صالح (يجب أن يبدأ بـ9 ويحتوي على 9 أرقام)"); return false; } if (quantity < 1 || quantity > 50) { setStatus("❗ العدد يجب أن يكون بين 1 و50"); return false; } return true; };
 
-      <input
-        type="text"
-        placeholder="اسم المسجد"
-        value={mosque}
-        onChange={(e) => setMosque(e.target.value)}
-        className="border p-2 w-full mb-2"
-      />
+const handleDonate = async () => { const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
 
-      <input
-        type="number"
-        min={1}
-        placeholder="عدد الأستيكات"
-        value={quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-        className="border p-2 w-full mb-2"
-      />
+if (!validateInputs()) return;
 
-      <button
-        onClick={handleDonate}
-        className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-      >
-        تأكيد التبرع
-      </button>
+try {
+  const res = await axios.post("https://saniah-api.onrender.com/pay", {
+    customer: cleanedPhone,
+    quantity: quantity,
+  });
 
-      {status && <div className="mt-4 text-red-600">{status}</div>}
-    </div>
-  );
+  if (!res.data.sessionID) {
+    setStatus("❌ لم يتم العثور على الرقم في النظام المصرفي");
+    return;
+  }
+
+  localStorage.setItem("donation_data", JSON.stringify({
+    phone: cleanedPhone,
+    quantity,
+    mosque: selectedMosque,
+    sessionID: res.data.sessionID,
+  }));
+
+  navigate("/confirm");
+} catch (err) {
+  console.error(err);
+  setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
 }
 
-export default Donate;
+};
+
+return ( <div className="p-4 space-y-4 max-w-md mx-auto"> <h2 className="text-xl font-bold">تبرع بالأستيكة</h2>
+
+<select
+    className="border p-2 w-full"
+    value={selectedMosque}
+    onChange={(e) => setSelectedMosque(e.target.value)}
+  >
+    <option value="">اختر المسجد</option>
+    {mosques.map((m) => (
+      <option key={m.id} value={m.name}>
+        {m.name}
+      </option>
+    ))}
+  </select>
+
+  <input
+    type="tel"
+    placeholder="رقم الهاتف (مثال: 92*******)"
+    className="border p-2 w-full"
+    value={phone}
+    onChange={(e) => setPhone(e.target.value)}
+  />
+
+  <input
+    type="number"
+    min={1}
+    max={50}
+    className="border p-2 w-full"
+    value={quantity}
+    onChange={(e) => setQuantity(Number(e.target.value))}
+  />
+
+  <button
+    onClick={handleDonate}
+    className="bg-blue-600 text-white px-4 py-2 rounded w-full"
+  >
+    تبرع الآن
+  </button>
+
+  {status && <div className="mt-2 text-center text-red-600">{status}</div>}
+</div>
+
+); }
+
+export default DonateForm;
+
