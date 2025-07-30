@@ -19,7 +19,7 @@ const handleDonate = async () => { const cleanedPhone = convertToEnglishDigits(p
 if (!validateInputs()) return;
 
 try {
-  const res = await axios.post("https://saniah-api.onrender.com/pay", {
+  const res =await axios.post("https://api.saniah.ly/pay", {
     customer: cleanedPhone,
     quantity: quantity,
   });
