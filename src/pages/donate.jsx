@@ -67,7 +67,7 @@ function DonateForm() {
       const result = res.data?.DoPTransResult?.toLowerCase();
       const sessionID = res.data?.sessionID;
 
-      console.log("📩 رد المصرف:", result);
+      console.log("📦 كامل الرد من السيرفر:", res.data);
 
       if ((result?.includes("ok") || result?.includes("otp")) && sessionID) {
         localStorage.setItem(
