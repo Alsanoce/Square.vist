@@ -53,41 +53,41 @@ function DonateForm() {
     return true;
   };
 
-  const handleDonate = async () => {
-    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
+const handleDonate = async () => {
+  const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
 
-    if (!validateInputs()) return;
+  if (!validateInputs()) return;
 
-    try {
-      const res = await axios.post("https://api.saniah.ly/pay", {
-        customer: cleanedPhone,
-        quantity: quantity,
-      });
+  try {
+    const res = await axios.post("https://api.saniah.ly/pay", {
+      customer: cleanedPhone,
+      quantity: quantity,
+    });
 
-      const result = res.data?.DoPTransResult?.toLowerCase();
-      const sessionID = res.data?.sessionID;
+    console.log("📦 كامل الرد من السيرفر:", res.data);
 
-      console.log("📦 كامل الرد من السيرفر:", res.data);
+    const { success, sessionID } = res.data;
 
-      if ((result?.includes("ok") || result?.includes("otp")) && sessionID) {
-        localStorage.setItem(
-          "donation_data",
-          JSON.stringify({
-            phone: cleanedPhone,
-            quantity,
-            mosque: selectedMosque,
-            sessionID: sessionID,
-          })
-        );
-        navigate("/confirm");
-      } else {
-        setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
-      }
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ حدث خطأ أثناء الاتصال بالخادم");
+    if (success && sessionID) {
+      localStorage.setItem(
+        "donation_data",
+        JSON.stringify({
+          phone: cleanedPhone,
+          quantity,
+          mosque: selectedMosque,
+          sessionID: sessionID,
+        })
+      );
+      navigate("/confirm");
+    } else {
+      setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    setStatus("❌ حدث خطأ أثناء الاتصال بالخادم");
+  }
+};
+
 
   return (
     <div className="p-4 space-y-4 max-w-md mx-auto">
