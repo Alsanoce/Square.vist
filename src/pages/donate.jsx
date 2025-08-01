@@ -4,7 +4,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import axios from "axios";
 
-export default function DonateForm() {
+function DonateForm() {
   const [phone, setPhone] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [status, setStatus] = useState(null);
@@ -14,7 +14,6 @@ export default function DonateForm() {
 
   const navigate = useNavigate();
 
-  // جلب قائمة المساجد من Firebase
   useEffect(() => {
     const fetchMosques = async () => {
       try {
@@ -25,7 +24,7 @@ export default function DonateForm() {
         }));
         setMosques(mosquesList);
       } catch (error) {
-        console.error("خطأ في جلب المساجد:", error);
+        console.error("فشل في جلب المساجد:", error);
         setStatus("❌ فشل تحميل قائمة المساجد");
       }
     };
@@ -33,61 +32,60 @@ export default function DonateForm() {
     fetchMosques();
   }, []);
 
-  // تحويل الأرقام العربية إلى إنجليزية
-  const convertDigits = (input) => {
+  const convertToEnglishDigits = (input) => {
     const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
     return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d));
   };
 
-  // التحقق من صحة المدخلات
-  const validateInputs = (phone) => {
-    const phoneRegex = /^966\d{9}$/;
+  const validateInputs = () => {
+    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\D/g, ""));
+    const phoneRegex = /^(218)?(9[1-9]\d{7}|1\d{8})$/; // دعم ليبيا (+218)
     
-    if (!selectedMosque || !phone || quantity < 1) {
-      setStatus("❗ الرجاء تعبئة جميع الحقول المطلوبة");
+    if (!selectedMosque || !cleanedPhone || quantity < 1) {
+      setStatus("❗ الرجاء تعبئة جميع الحقول");
       return false;
     }
     
-    if (!phoneRegex.test(phone)) {
-      setStatus("❗ رقم الجوال يجب أن يبدأ بـ 966 ويتكون من 12 رقمًا");
+    if (!phoneRegex.test(cleanedPhone)) {
+      setStatus("❗ رقم الهاتف الليبي غير صالح (يبدأ بـ 9 أو 1 ويتكون من 9 أرقام)");
       return false;
     }
     
     if (quantity < 1 || quantity > 50) {
-      setStatus("❗ عدد الأستيكات يجب أن يكون بين 1 و50");
+      setStatus("❗ الكمية يجب أن تكون بين 1 و50");
       return false;
     }
     
     return true;
   };
 
-  // معالجة عملية التبرع
   const handleDonate = async () => {
     if (isLoading) return;
     
-    const cleanedPhone = "966" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
+    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\D/g, ""));
     
-    if (!validateInputs(cleanedPhone)) return;
+    if (!validateInputs()) return;
 
     setIsLoading(true);
     setStatus(null);
 
     try {
-      const response = await axios.post("https://api.saniah.ly/pay", {
-        customer: cleanedPhone,
+      const res = await axios.post("https://api.saniah.ly/pay", {
+        customer: `218${cleanedPhone}`, // إضافة مفتاح ليبيا
         quantity: quantity,
-        mosque: selectedMosque
+        mosque: selectedMosque,
+        countryCode: "LY" // إضافة كود الدولة
       });
 
-      const sessionID = (response.data.sessionID || "").toString().trim();
+      const sessionID = (res.data.sessionID || "").toString().trim();
 
       if (sessionID === "BAL") {
-        setStatus("❌ الرصيد غير كافي لاتمام العملية");
+        setStatus("❌ الرصيد غير كافي");
         return;
       }
 
       if (sessionID === "ACC") {
-        setStatus("❌ الرقم غير مفعل في خدمة الدفع");
+        setStatus("❌ الرقم غير مفعل بالخدمة");
         return;
       }
 
@@ -96,28 +94,19 @@ export default function DonateForm() {
         return;
       }
 
-      // إرسال OTP
-      const otpResponse = await axios.post("https://api.saniah.ly/send-otp", {
-        phone: cleanedPhone,
-        sessionID: sessionID
+      // حفظ البيانات للتأكيد
+      navigate("/confirm", { 
+        state: {
+          phone: `218${cleanedPhone}`,
+          quantity,
+          mosque: selectedMosque,
+          sessionID
+        }
       });
 
-      if (otpResponse.data.success) {
-        navigate("/confirm", { 
-          state: {
-            phone: cleanedPhone,
-            quantity,
-            mosque: selectedMosque,
-            sessionID
-          }
-        });
-      } else {
-        setStatus("❌ تمت العملية ولكن لم يتم إرسال الكود");
-      }
-
-    } catch (error) {
-      console.error("خطأ في عملية الدفع:", error);
-      setStatus("❌ فشل في إتمام العملية، الرجاء المحاولة لاحقًا");
+    } catch (err) {
+      console.error("خطأ في الدفع:", err);
+      setStatus("❌ فشل في إتمام العملية");
     } finally {
       setIsLoading(false);
     }
@@ -125,74 +114,58 @@ export default function DonateForm() {
 
   return (
     <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold text-center mb-6">نموذج التبرع</h1>
-      
+      <h2 className="text-xl font-bold text-center mb-4">نموذج التبرع</h2>
+
       <div className="space-y-4">
-        {/* اختيار المسجد */}
-        <div>
-          <label className="block mb-1">اختر المسجد:</label>
-          <select
-            className="w-full p-2 border rounded"
-            value={selectedMosque}
-            onChange={(e) => setSelectedMosque(e.target.value)}
-            disabled={isLoading}
-          >
-            <option value="">-- اختر مسجد --</option>
-            {mosques.map((mosque) => (
-              <option key={mosque.id} value={mosque.name}>
-                {mosque.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select
+          className="w-full p-2 border rounded"
+          value={selectedMosque}
+          onChange={(e) => setSelectedMosque(e.target.value)}
+          disabled={isLoading}
+        >
+          <option value="">اختر المسجد</option>
+          {mosques.map((m) => (
+            <option key={m.id} value={m.name}>{m.name}</option>
+          ))}
+        </select>
 
-        {/* إدخال رقم الجوال */}
-        <div>
-          <label className="block mb-1">رقم الجوال:</label>
-          <div className="flex">
-            <span className="p-2 bg-gray-100 border rounded-r-none">966+</span>
-            <input
-              type="tel"
-              placeholder="5XXXXXXX"
-              className="flex-1 p-2 border rounded-l-none"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-        </div>
-
-        {/* كمية التبرع */}
-        <div>
-          <label className="block mb-1">عدد الأستيكات (1-50):</label>
+        <div className="flex items-center">
+          <span className="p-2 bg-gray-100 border rounded-r-none">+218</span>
           <input
-            type="number"
-            min="1"
-            max="50"
-            className="w-full p-2 border rounded"
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
+            type="tel"
+            placeholder="9XXXXXXX أو 1XXXXXXXX"
+            className="flex-1 p-2 border rounded-l-none"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
             disabled={isLoading}
           />
         </div>
 
-        {/* زر التبرع */}
+        <input
+          type="number"
+          min="1"
+          max="50"
+          className="w-full p-2 border rounded"
+          value={quantity}
+          onChange={(e) => setQuantity(Number(e.target.value))}
+          disabled={isLoading}
+        />
+
         <button
           onClick={handleDonate}
           disabled={isLoading}
-          className={`w-full py-2 rounded text-white ${
+          className={`w-full p-2 rounded text-white ${
             isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
           }`}
         >
-          {isLoading ? "جاري المعالجة..." : "التبرع الآن"}
+          {isLoading ? "جاري المعالجة..." : "تبرع الآن"}
         </button>
 
-        {/* رسائل الحالة */}
         {status && (
           <div className={`p-2 text-center rounded ${
             status.includes("❌") ? "bg-red-100 text-red-700" : 
             status.includes("❗") ? "bg-yellow-100 text-yellow-700" : 
-            "bg-green-100 text-green-700"
+            "bg-blue-100 text-blue-700"
           }`}>
             {status}
           </div>
@@ -200,4 +173,6 @@ export default function DonateForm() {
       </div>
     </div>
   );
-      }
+}
+
+export default DonateForm;
