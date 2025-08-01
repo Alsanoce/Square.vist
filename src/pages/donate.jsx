@@ -53,41 +53,49 @@ function DonateForm() {
     return true;
   };
 
-const handleDonate = async () => {
-  const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
+  const handleDonate = async () => {
+    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
 
-  if (!validateInputs()) return;
+    if (!validateInputs()) return;
 
-  try {
-    const res = await axios.post("https://api.saniah.ly/pay", {
-      customer: cleanedPhone,
-      quantity: quantity,
-    });
+    try {
+      const res = await axios.post("https://api.saniah.ly/pay", {
+        customer: cleanedPhone,
+        quantity: quantity,
+      });
 
-    console.log("📦 كامل الرد من السيرفر:", res.data);
+      const sessionID = res.data.sessionID;
 
-    const { success, sessionID } = res.data;
+      // ✅ التحقق من الرصيد
+      if (sessionID === "BAL") {
+        setStatus("❌ الرصيد غير كافي");
+        return;
+      }
 
-    if (success && sessionID) {
-      localStorage.setItem(
-        "donation_data",
-        JSON.stringify({
-          phone: cleanedPhone,
-          quantity,
-          mosque: selectedMosque,
-          sessionID: sessionID,
-        })
-      );
+      if (sessionID === "ACC") {
+        setStatus("❌ الرقم غير مفعل بالخدمة");
+        return;
+      }
+
+      if (!sessionID || sessionID.length < 5) {
+        setStatus("❌ خطأ في عملية الدفع");
+        return;
+      }
+
+      // ✅ حفظ البيانات والتوجيه إلى صفحة التأكيد
+      localStorage.setItem("donation_data", JSON.stringify({
+        phone: cleanedPhone,
+        quantity,
+        mosque: selectedMosque,
+        sessionID: sessionID,
+      }));
+
       navigate("/confirm");
-    } else {
+    } catch (err) {
+      console.error(err);
       setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
     }
-  } catch (err) {
-    console.error(err);
-    setStatus("❌ حدث خطأ أثناء الاتصال بالخادم");
-  }
-};
-
+  };
 
   return (
     <div className="p-4 space-y-4 max-w-md mx-auto">
