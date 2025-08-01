@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import axios from "axios";
 import OtpInput from "react-otp-input";
 
-export default function OtpConfirmationPage() {
+function OtpConfirmationPage() {
   const [otp, setOtp] = useState("");
   const [status, setStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -15,14 +15,12 @@ export default function OtpConfirmationPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  // تحميل بيانات التبرع أو إعادة التوجيه
   useEffect(() => {
     if (!state?.sessionID) {
       navigate("/donate");
     }
   }, [navigate, state]);
 
-  // العد التنازلي لإعادة الإرسال
   useEffect(() => {
     if (resendDisabled) {
       const timer = setInterval(() => {
@@ -32,7 +30,6 @@ export default function OtpConfirmationPage() {
     }
   }, [resendDisabled]);
 
-  // حفظ بيانات التبرع في Firebase
   const saveDonation = async () => {
     try {
       await addDoc(collection(db, "donations"), {
@@ -40,9 +37,9 @@ export default function OtpConfirmationPage() {
         amount: state.quantity,
         mosque: state.mosque,
         sessionID: state.sessionID,
-        status: "مكتمل",
+        country: "ليبيا",
         timestamp: new Date(),
-        otpVerified: true
+        status: "بانتظار التأكيد"
       });
     } catch (error) {
       console.error("خطأ في حفظ البيانات:", error);
@@ -50,7 +47,6 @@ export default function OtpConfirmationPage() {
     }
   };
 
-  // إعادة إرسال كود OTP
   const handleResend = async () => {
     setResendDisabled(true);
     setStatus("جاري إعادة إرسال الكود...");
@@ -58,7 +54,7 @@ export default function OtpConfirmationPage() {
     try {
       await axios.post("https://api.saniah.ly/resend-otp", {
         phone: state.phone,
-        sessionID: state.sessionID
+        countryCode: "LY"
       });
       setStatus("✔ تم إرسال كود جديد");
     } catch (error) {
@@ -66,11 +62,10 @@ export default function OtpConfirmationPage() {
     }
   };
 
-  // تأكيد الدفع
   const handleConfirm = async () => {
     if (isLoading) return;
     if (otp.length !== 4) {
-      setStatus("❗ الرجاء إدخال الكود المكون من 4 أرقام");
+      setStatus("❗ الرجاء إدخال كود مكون من 4 أرقام");
       return;
     }
 
@@ -78,32 +73,23 @@ export default function OtpConfirmationPage() {
     setStatus(null);
 
     try {
-      // التحقق من صحة الجلسة
-      const verifyRes = await axios.get(
-        `https://api.saniah.ly/verify/${state.sessionID}`
-      );
-      
-      if (!verifyRes.data.isValid) {
-        setStatus("❌ انتهت صلاحية الجلسة، يرجى البدء من جديد");
-        return;
-      }
-
-      // تأكيد الدفع
-      const confirmRes = await axios.post("https://api.saniah.ly/confirm", {
+      const res = await axios.post("https://api.saniah.ly/confirm", {
         otp,
-        sessionID: state.sessionID
+        phone: state.phone,
+        sessionID: state.sessionID,
+        countryCode: "LY"
       });
 
-      if (confirmRes.data.success) {
+      if (res.data.success) {
         await saveDonation();
         setStatus("✅ تمت العملية بنجاح");
         setTimeout(() => navigate("/thank-you"), 1500);
       } else {
-        setStatus(confirmRes.data.message || "❌ كود التأكيد غير صحيح");
+        setStatus(res.data.message || "❌ كود التأكيد غير صحيح");
       }
-    } catch (error) {
-      console.error("خطأ في التأكيد:", error);
-      setStatus("❌ حدث خطأ أثناء التأكيد");
+    } catch (err) {
+      console.error("خطأ في التأكيد:", err);
+      setStatus("❌ فشل في الاتصال بالخادم");
     } finally {
       setIsLoading(false);
     }
@@ -111,64 +97,55 @@ export default function OtpConfirmationPage() {
 
   return (
     <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold text-center mb-6">تأكيد الدفع</h1>
+      <h2 className="text-xl font-bold text-center mb-6">تأكيد الدفع</h2>
       
-      <div className="text-center mb-6">
-        <p>تم إرسال كود التحقق إلى الرقم:</p>
+      <div className="text-center mb-4">
+        <p>تم إرسال كود التحقق إلى:</p>
         <p className="font-bold">+{state?.phone}</p>
       </div>
 
-      {/* إدخال OTP */}
       <div className="flex justify-center mb-6">
         <OtpInput
           value={otp}
           onChange={setOtp}
           numInputs={4}
           renderInput={(props) => (
-            <input
-              {...props}
-              className="otp-input"
-              dir="ltr"
-            />
+            <input {...props} className="otp-input" dir="ltr" />
           )}
           containerStyle="gap-2"
           inputStyle={{
             width: '3rem',
             height: '3.5rem',
             fontSize: '1.5rem',
-            borderRadius: '8px',
             border: '1px solid #ddd',
-            textAlign: 'center'
+            borderRadius: '8px'
           }}
           shouldAutoFocus
         />
       </div>
 
-      {/* زر التأكيد */}
       <button
         onClick={handleConfirm}
         disabled={isLoading}
-        className={`w-full py-3 rounded text-white mb-3 ${
+        className={`w-full p-3 mb-3 rounded text-white ${
           isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
         }`}
       >
         {isLoading ? "جاري التأكيد..." : "تأكيد الدفع"}
       </button>
 
-      {/* إعادة إرسال الكود */}
       <button
         onClick={handleResend}
         disabled={resendDisabled || isLoading}
-        className={`w-full py-2 ${
+        className={`w-full p-2 ${
           resendDisabled ? "text-gray-400" : "text-blue-600 hover:text-blue-800"
         }`}
       >
         {resendDisabled ? `إعادة إرسال (${countdown})` : "إعادة إرسال الكود"}
       </button>
 
-      {/* رسائل الحالة */}
       {status && (
-        <div className={`mt-4 p-3 text-center rounded-lg ${
+        <div className={`mt-4 p-3 text-center rounded ${
           status.includes("❌") ? "bg-red-100 text-red-700" : 
           status.includes("❗") ? "bg-yellow-100 text-yellow-700" : 
           "bg-green-100 text-green-700"
@@ -179,3 +156,5 @@ export default function OtpConfirmationPage() {
     </div>
   );
 }
+
+export default OtpConfirmationPage;
