@@ -64,9 +64,8 @@ function DonateForm() {
         quantity: quantity,
       });
 
-      const sessionID = res.data.sessionID;
+      const sessionID = (res.data.sessionID || "").trim().toUpperCase();
 
-      // ✅ التحقق من الرصيد
       if (sessionID === "BAL") {
         setStatus("❌ الرصيد غير كافي");
         return;
@@ -77,22 +76,22 @@ function DonateForm() {
         return;
       }
 
-      if (!sessionID || sessionID.length < 5) {
-        setStatus("❌ خطأ في عملية الدفع");
+      if (!sessionID || sessionID.length < 10) {
+        setStatus("❌ رد غير متوقع من المصرف");
         return;
       }
 
-      // ✅ حفظ البيانات والتوجيه إلى صفحة التأكيد
       localStorage.setItem("donation_data", JSON.stringify({
         phone: cleanedPhone,
         quantity,
         mosque: selectedMosque,
-        sessionID: sessionID,
+        sessionID,
       }));
 
       navigate("/confirm");
+
     } catch (err) {
-      console.error(err);
+      console.error("خطأ أثناء الإرسال:", err);
       setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
     }
   };
