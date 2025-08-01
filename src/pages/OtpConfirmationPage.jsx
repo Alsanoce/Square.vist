@@ -1,90 +1,181 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { useNavigate, useLocation } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import OtpInput from "react-otp-input";
 
-function OtpConfirmationPage() {
+export default function OtpConfirmationPage() {
   const [otp, setOtp] = useState("");
   const [status, setStatus] = useState(null);
-  const [donationData, setDonationData] = useState(null);
-  const navigate = useNavigate(); // ✅ لتوجيه المستخدم
+  const [isLoading, setIsLoading] = useState(false);
+  const [resendDisabled, setResendDisabled] = useState(false);
+  const [countdown, setCountdown] = useState(60);
+  
+  const navigate = useNavigate();
+  const { state } = useLocation();
 
+  // تحميل بيانات التبرع أو إعادة التوجيه
   useEffect(() => {
-    const data = localStorage.getItem("donation_data");
-    if (data) {
-      setDonationData(JSON.parse(data));
+    if (!state?.sessionID) {
+      navigate("/donate");
     }
-  }, []);
+  }, [navigate, state]);
 
-  const saveDonation = async ({ phone, quantity, mosque, sessionID }) => {
+  // العد التنازلي لإعادة الإرسال
+  useEffect(() => {
+    if (resendDisabled) {
+      const timer = setInterval(() => {
+        setCountdown(prev => prev <= 1 ? (clearInterval(timer), 60 : prev - 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [resendDisabled]);
+
+  // حفظ بيانات التبرع في Firebase
+  const saveDonation = async () => {
     try {
-      await addDoc(collection(db, "transactions"), {
-        customer: phone,
-        amount: quantity,
-        mosqueName: mosque,
-        sessionID,
-        status: "confirmed",
-        timestamp: new Date().toISOString(),
-        deliveryStatus: "بانتظار التوصيل"
+      await addDoc(collection(db, "donations"), {
+        phone: state.phone,
+        amount: state.quantity,
+        mosque: state.mosque,
+        sessionID: state.sessionID,
+        status: "مكتمل",
+        timestamp: new Date(),
+        otpVerified: true
       });
-      console.log("✅ تم تسجيل التبرع في Firestore");
     } catch (error) {
-      console.error("❌ فشل في التسجيل:", error);
+      console.error("خطأ في حفظ البيانات:", error);
+      throw error;
     }
   };
 
+  // إعادة إرسال كود OTP
+  const handleResend = async () => {
+    setResendDisabled(true);
+    setStatus("جاري إعادة إرسال الكود...");
+    
+    try {
+      await axios.post("https://api.saniah.ly/resend-otp", {
+        phone: state.phone,
+        sessionID: state.sessionID
+      });
+      setStatus("✔ تم إرسال كود جديد");
+    } catch (error) {
+      setStatus("❌ فشل في إعادة الإرسال");
+    }
+  };
+
+  // تأكيد الدفع
   const handleConfirm = async () => {
-    if (!otp || !donationData?.sessionID) {
-      setStatus("❌ البيانات غير مكتملة أو الكود غير مدخل");
+    if (isLoading) return;
+    if (otp.length !== 4) {
+      setStatus("❗ الرجاء إدخال الكود المكون من 4 أرقام");
       return;
     }
 
+    setIsLoading(true);
+    setStatus(null);
+
     try {
-      const res = await axios.post("https://api.saniah.ly/confirm", {
+      // التحقق من صحة الجلسة
+      const verifyRes = await axios.get(
+        `https://api.saniah.ly/verify/${state.sessionID}`
+      );
+      
+      if (!verifyRes.data.isValid) {
+        setStatus("❌ انتهت صلاحية الجلسة، يرجى البدء من جديد");
+        return;
+      }
+
+      // تأكيد الدفع
+      const confirmRes = await axios.post("https://api.saniah.ly/confirm", {
         otp,
-        phone: donationData.phone,
-        quantity: donationData.quantity,
-        mosque: donationData.mosque,
-        sessionID: donationData.sessionID,
+        sessionID: state.sessionID
       });
 
-      if (res.data.success) {
-        await saveDonation(donationData);
-        setStatus("✅ تم الدفع بنجاح");
-        localStorage.removeItem("donation_data");
-        navigate("/thank-you"); // ✅ التوجيه بعد النجاح
+      if (confirmRes.data.success) {
+        await saveDonation();
+        setStatus("✅ تمت العملية بنجاح");
+        setTimeout(() => navigate("/thank-you"), 1500);
       } else {
-        setStatus(res.data.message || "❌ حدث خطأ أثناء تأكيد الدفع");
+        setStatus(confirmRes.data.message || "❌ كود التأكيد غير صحيح");
       }
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ فشل في الاتصال بالخادم");
+    } catch (error) {
+      console.error("خطأ في التأكيد:", error);
+      setStatus("❌ حدث خطأ أثناء التأكيد");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto text-center">
-      <h2 className="text-xl font-bold mb-4">أدخل كود OTP</h2>
+    <div className="p-4 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-center mb-6">تأكيد الدفع</h1>
+      
+      <div className="text-center mb-6">
+        <p>تم إرسال كود التحقق إلى الرقم:</p>
+        <p className="font-bold">+{state?.phone}</p>
+      </div>
 
-      <input
-        type="text"
-        maxLength={4}
-        className="border p-2 w-full mb-2 text-center"
-        value={otp}
-        onChange={(e) => setOtp(e.target.value)}
-      />
+      {/* إدخال OTP */}
+      <div className="flex justify-center mb-6">
+        <OtpInput
+          value={otp}
+          onChange={setOtp}
+          numInputs={4}
+          renderInput={(props) => (
+            <input
+              {...props}
+              className="otp-input"
+              dir="ltr"
+            />
+          )}
+          containerStyle="gap-2"
+          inputStyle={{
+            width: '3rem',
+            height: '3.5rem',
+            fontSize: '1.5rem',
+            borderRadius: '8px',
+            border: '1px solid #ddd',
+            textAlign: 'center'
+          }}
+          shouldAutoFocus
+        />
+      </div>
 
+      {/* زر التأكيد */}
       <button
         onClick={handleConfirm}
-        className="bg-green-600 text-white px-4 py-2 rounded w-full"
+        disabled={isLoading}
+        className={`w-full py-3 rounded text-white mb-3 ${
+          isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+        }`}
       >
-        تأكيد الدفع
+        {isLoading ? "جاري التأكيد..." : "تأكيد الدفع"}
       </button>
 
-      {status && <div className="mt-4">{status}</div>}
+      {/* إعادة إرسال الكود */}
+      <button
+        onClick={handleResend}
+        disabled={resendDisabled || isLoading}
+        className={`w-full py-2 ${
+          resendDisabled ? "text-gray-400" : "text-blue-600 hover:text-blue-800"
+        }`}
+      >
+        {resendDisabled ? `إعادة إرسال (${countdown})` : "إعادة إرسال الكود"}
+      </button>
+
+      {/* رسائل الحالة */}
+      {status && (
+        <div className={`mt-4 p-3 text-center rounded-lg ${
+          status.includes("❌") ? "bg-red-100 text-red-700" : 
+          status.includes("❗") ? "bg-yellow-100 text-yellow-700" : 
+          "bg-green-100 text-green-700"
+        }`}>
+          {status}
+        </div>
+      )}
     </div>
   );
 }
-
-export default OtpConfirmationPage;
