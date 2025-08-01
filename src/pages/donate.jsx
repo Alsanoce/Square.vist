@@ -4,15 +4,17 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import axios from "axios";
 
-function DonateForm() {
+export default function DonateForm() {
   const [phone, setPhone] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [status, setStatus] = useState(null);
   const [mosques, setMosques] = useState([]);
   const [selectedMosque, setSelectedMosque] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
 
+  // جلب قائمة المساجد من Firebase
   useEffect(() => {
     const fetchMosques = async () => {
       try {
@@ -23,123 +25,179 @@ function DonateForm() {
         }));
         setMosques(mosquesList);
       } catch (error) {
-        console.error("فشل في جلب المساجد من Firebase:", error);
+        console.error("خطأ في جلب المساجد:", error);
+        setStatus("❌ فشل تحميل قائمة المساجد");
       }
     };
 
     fetchMosques();
   }, []);
 
-  const convertToEnglishDigits = (input) => {
+  // تحويل الأرقام العربية إلى إنجليزية
+  const convertDigits = (input) => {
     const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
-    return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d).toString());
+    return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d));
   };
 
-  const validateInputs = () => {
-    const cleaned = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
-    const phoneRegex = /^9\d{8}$/;
-    if (!selectedMosque || !cleaned || quantity < 1) {
-      setStatus("❗ الرجاء تعبئة جميع الحقول بشكل صحيح");
+  // التحقق من صحة المدخلات
+  const validateInputs = (phone) => {
+    const phoneRegex = /^966\d{9}$/;
+    
+    if (!selectedMosque || !phone || quantity < 1) {
+      setStatus("❗ الرجاء تعبئة جميع الحقول المطلوبة");
       return false;
     }
-    if (!phoneRegex.test(cleaned)) {
-      setStatus("❗ رقم الهاتف غير صالح (يجب أن يبدأ بـ9 ويحتوي على 9 أرقام)");
+    
+    if (!phoneRegex.test(phone)) {
+      setStatus("❗ رقم الجوال يجب أن يبدأ بـ 966 ويتكون من 12 رقمًا");
       return false;
     }
+    
     if (quantity < 1 || quantity > 50) {
-      setStatus("❗ العدد يجب أن يكون بين 1 و50");
+      setStatus("❗ عدد الأستيكات يجب أن يكون بين 1 و50");
       return false;
     }
+    
     return true;
   };
 
+  // معالجة عملية التبرع
   const handleDonate = async () => {
-    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\s/g, ""));
+    if (isLoading) return;
+    
+    const cleanedPhone = "966" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
+    
+    if (!validateInputs(cleanedPhone)) return;
 
-    if (!validateInputs()) return;
+    setIsLoading(true);
+    setStatus(null);
 
     try {
-      const res = await axios.post("https://api.saniah.ly/pay", {
+      const response = await axios.post("https://api.saniah.ly/pay", {
         customer: cleanedPhone,
         quantity: quantity,
+        mosque: selectedMosque
       });
 
-      const sessionID = (res.data.sessionID || "").trim().toUpperCase();
+      const sessionID = (response.data.sessionID || "").toString().trim();
 
       if (sessionID === "BAL") {
-        setStatus("❌ الرصيد غير كافي");
+        setStatus("❌ الرصيد غير كافي لاتمام العملية");
         return;
       }
 
       if (sessionID === "ACC") {
-        setStatus("❌ الرقم غير مفعل بالخدمة");
+        setStatus("❌ الرقم غير مفعل في خدمة الدفع");
         return;
       }
 
       if (!sessionID || sessionID.length < 10) {
-        setStatus("❌ رد غير متوقع من المصرف");
+        setStatus("❌ استجابة غير متوقعة من نظام الدفع");
         return;
       }
 
-      localStorage.setItem("donation_data", JSON.stringify({
+      // إرسال OTP
+      const otpResponse = await axios.post("https://api.saniah.ly/send-otp", {
         phone: cleanedPhone,
-        quantity,
-        mosque: selectedMosque,
-        sessionID,
-      }));
+        sessionID: sessionID
+      });
 
-      navigate("/confirm");
+      if (otpResponse.data.success) {
+        navigate("/confirm", { 
+          state: {
+            phone: cleanedPhone,
+            quantity,
+            mosque: selectedMosque,
+            sessionID
+          }
+        });
+      } else {
+        setStatus("❌ تمت العملية ولكن لم يتم إرسال الكود");
+      }
 
-    } catch (err) {
-      console.error("خطأ أثناء الإرسال:", err);
-      setStatus("❌ فشل الاتصال بالخادم أو الرقم غير مفعل بالخدمة");
+    } catch (error) {
+      console.error("خطأ في عملية الدفع:", error);
+      setStatus("❌ فشل في إتمام العملية، الرجاء المحاولة لاحقًا");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-4 space-y-4 max-w-md mx-auto">
-      <h2 className="text-xl font-bold">تبرع بالأستيكة</h2>
+    <div className="p-4 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold text-center mb-6">نموذج التبرع</h1>
+      
+      <div className="space-y-4">
+        {/* اختيار المسجد */}
+        <div>
+          <label className="block mb-1">اختر المسجد:</label>
+          <select
+            className="w-full p-2 border rounded"
+            value={selectedMosque}
+            onChange={(e) => setSelectedMosque(e.target.value)}
+            disabled={isLoading}
+          >
+            <option value="">-- اختر مسجد --</option>
+            {mosques.map((mosque) => (
+              <option key={mosque.id} value={mosque.name}>
+                {mosque.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <select
-        className="border p-2 w-full"
-        value={selectedMosque}
-        onChange={(e) => setSelectedMosque(e.target.value)}
-      >
-        <option value="">اختر المسجد</option>
-        {mosques.map((m) => (
-          <option key={m.id} value={m.name}>
-            {m.name}
-          </option>
-        ))}
-      </select>
+        {/* إدخال رقم الجوال */}
+        <div>
+          <label className="block mb-1">رقم الجوال:</label>
+          <div className="flex">
+            <span className="p-2 bg-gray-100 border rounded-r-none">966+</span>
+            <input
+              type="tel"
+              placeholder="5XXXXXXX"
+              className="flex-1 p-2 border rounded-l-none"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
 
-      <input
-        type="tel"
-        placeholder="رقم الهاتف (مثال: 92*******)"
-        className="border p-2 w-full"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-      />
+        {/* كمية التبرع */}
+        <div>
+          <label className="block mb-1">عدد الأستيكات (1-50):</label>
+          <input
+            type="number"
+            min="1"
+            max="50"
+            className="w-full p-2 border rounded"
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            disabled={isLoading}
+          />
+        </div>
 
-      <input
-        type="number"
-        min={1}
-        max={50}
-        className="border p-2 w-full"
-        value={quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-      />
+        {/* زر التبرع */}
+        <button
+          onClick={handleDonate}
+          disabled={isLoading}
+          className={`w-full py-2 rounded text-white ${
+            isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {isLoading ? "جاري المعالجة..." : "التبرع الآن"}
+        </button>
 
-      <button
-        onClick={handleDonate}
-        className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-      >
-        تبرع الآن
-      </button>
-
-      {status && <div className="mt-2 text-center text-red-600">{status}</div>}
+        {/* رسائل الحالة */}
+        {status && (
+          <div className={`p-2 text-center rounded ${
+            status.includes("❌") ? "bg-red-100 text-red-700" : 
+            status.includes("❗") ? "bg-yellow-100 text-yellow-700" : 
+            "bg-green-100 text-green-700"
+          }`}>
+            {status}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
-
-export default DonateForm;
+      }
