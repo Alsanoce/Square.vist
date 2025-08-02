@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";; 
 import { db } from "../firebase";
 import axios from "axios";
-import PropTypes from "prop-types";
 import OTPInput from 'react-otp-input';
 
 function DonateForm() {
