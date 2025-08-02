@@ -5,10 +5,10 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      external: ['prop-types','react-otp-input']
+      external: ['prop-types', 'react-otp-input']
     }
   },
-  server: {
-    port: 3000
+  optimizeDeps: {
+    include: ['prop-types']
   }
 });
