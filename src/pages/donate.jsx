@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
+import PropTypes from 'prop-types'; 
 import { db } from "../firebase";
 import axios from "axios";
 
