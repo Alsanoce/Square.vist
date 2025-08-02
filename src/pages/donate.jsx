@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import axios from "axios";
-import PropTypes from "prop-types";
+
 
 function DonateForm() {
   const [phone, setPhone] = useState("");
@@ -264,8 +264,6 @@ function DonateForm() {
   );
 }
 
-DonateForm.propTypes = {
-  // يمكن إضافة تحقق من الخصائص هنا إذا لزم الأمر
-};
+
 
 export default DonateForm;
