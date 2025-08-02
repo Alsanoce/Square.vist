@@ -40,20 +40,24 @@ function DonateForm() {
   };
 
   const validateInputs = (phoneNumber) => {
-    const phoneRegex = /^9\d{8}$/;
+    // تنظيف الرقم وإزالة أي أحرف غير رقمية باستثناء علامة +
+    const cleaned = convertToEnglishDigits(phoneNumber.replace(/[^\d+]/g, ""));
+    
+    // التحقق من أن الرقم يبدأ بـ +218 ويتكون من 9 أرقام بعده
+    const phoneRegex = /^\+218\d{9}$/;
     
     if (!selectedMosque) {
       setStatus("❗ الرجاء اختيار المسجد");
       return false;
     }
     
-    if (!phoneNumber) {
+    if (!cleaned) {
       setStatus("❗ الرجاء إدخال رقم الهاتف");
       return false;
     }
     
-    if (!phoneRegex.test(phoneNumber)) {
-      setStatus("❗ رقم الهاتف غير صالح (يجب أن يبدأ بـ9 ويحتوي على 9 أرقام)");
+    if (!phoneRegex.test(cleaned)) {
+      setStatus("❗ رقم الهاتف غير صالح (يجب أن يبدأ بـ +218 ويحتوي على 9 أرقام بعده)");
       return false;
     }
     
@@ -62,7 +66,7 @@ function DonateForm() {
       return false;
     }
     
-    return true;
+    return cleaned; // نعيد الرقم النظيف
   };
 
   const processSessionID = (sessionID) => {
@@ -126,8 +130,10 @@ function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
     
-    const cleanedPhone = convertToEnglishDigits(phone.trim().replace(/\D/g, ""));
-    if (!validateInputs(cleanedPhone)) return;
+    // تنظيف الرقم والتحقق منه
+    const cleanedPhone = convertToEnglishDigits(phone.replace(/[^\d+]/g, ""));
+    const validatedPhone = validateInputs(cleanedPhone);
+    if (!validatedPhone) return;
 
     setIsLoading(true);
     setStatus(null);
@@ -135,7 +141,7 @@ function DonateForm() {
     try {
       // Step 1: Process payment
       const paymentRes = await axios.post("https://api.saniah.ly/pay", {
-        customer: cleanedPhone,
+        customer: validatedPhone,
         quantity,
       });
 
@@ -144,13 +150,13 @@ function DonateForm() {
       if (!sessionID) return;
 
       // Step 3: Send OTP
-      await sendOTP(cleanedPhone, sessionID);
+      await sendOTP(validatedPhone, sessionID);
       
       // Step 4: Save data and navigate
       localStorage.setItem(
         "donation_data",
         JSON.stringify({
-          phone: cleanedPhone,
+          phone: validatedPhone,
           quantity,
           mosque: selectedMosque,
           sessionID,
@@ -160,7 +166,7 @@ function DonateForm() {
 
       navigate("/confirm", {
         state: {
-          phone: cleanedPhone,
+          phone: validatedPhone,
           sessionID,
         },
       });
@@ -199,7 +205,7 @@ function DonateForm() {
 
         <input
           type="tel"
-          placeholder="رقم الهاتف (مثال: 92*******)"
+          placeholder="رقم الهاتف (مثال: +2189XXXXXXXX)"
           className="border p-2 w-full rounded-lg focus:ring-2 focus:ring-blue-500"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
