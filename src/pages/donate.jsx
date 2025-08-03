@@ -14,6 +14,8 @@ export default function DonateForm() {
 
   const navigate = useNavigate();
 
+  const pricePerStick = 6;
+
   useEffect(() => {
     const fetchMosques = async () => {
       try {
@@ -61,9 +63,10 @@ export default function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, ""));
-
+    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
     if (!validateInputs(cleanedPhone)) return;
+
+    const amount = quantity * pricePerStick;
 
     setIsLoading(true);
     setStatus(null);
@@ -71,7 +74,7 @@ export default function DonateForm() {
     try {
       const response = await axios.post("https://api.saniah.ly/pay", {
         customer: cleanedPhone,
-        quantity,
+        amount: amount,
         mosque: selectedMosque,
       });
 
