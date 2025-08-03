@@ -13,7 +13,6 @@ export default function DonateForm() {
   const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
-
   const pricePerStick = 6;
 
   useEffect(() => {
@@ -39,15 +38,15 @@ export default function DonateForm() {
     return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d));
   };
 
-  const validateInputs = (phone) => {
+  const validateInputs = (fullPhone) => {
     const phoneRegex = /^\+2189\d{8}$/;
 
-    if (!selectedMosque || !phone || quantity < 1) {
+    if (!selectedMosque || !fullPhone || quantity < 1) {
       setStatus("❗ الرجاء تعبئة جميع الحقول المطلوبة");
       return false;
     }
 
-    if (!phoneRegex.test(phone)) {
+    if (!phoneRegex.test(fullPhone)) {
       setStatus("❗ رقم الهاتف يجب أن يبدأ بـ +2189 ويتكون من 9 أرقام");
       return false;
     }
@@ -63,8 +62,10 @@ export default function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
-    if (!validateInputs(cleanedPhone)) return;
+    const cleaned = convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
+    const fullPhone = "+218" + cleaned;
+
+    if (!validateInputs(fullPhone)) return;
 
     const amount = quantity * pricePerStick;
 
@@ -73,9 +74,10 @@ export default function DonateForm() {
 
     try {
       const response = await axios.post("https://api.saniah.ly/pay", {
-        customer: cleanedPhone,
-        quantity,
+        customer: fullPhone,
+        amount,
         mosque: selectedMosque,
+        quantity,
       });
 
       const sessionID = (response.data.sessionID || "").toString().trim();
@@ -96,14 +98,14 @@ export default function DonateForm() {
       }
 
       const otpResponse = await axios.post("https://api.saniah.ly/send-otp", {
-        phone: cleanedPhone,
+        phone: fullPhone,
         sessionID,
       });
 
       if (otpResponse.data.success) {
         navigate("/confirm", {
           state: {
-            phone: cleanedPhone,
+            phone: fullPhone,
             quantity,
             mosque: selectedMosque,
             sessionID,
