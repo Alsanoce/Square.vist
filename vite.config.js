@@ -3,19 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      'axios': '/node_modules/axios/dist/axios.min.js'
-    }
+  optimizeDeps: {
+    include: ['axios']
   },
   build: {
-    rollupOptions: {
-      external: ['axios'],
-      output: {
-        globals: {
-          axios: 'axios'
-        }
-      }
+    commonjsOptions: {
+      include: [/axios/, /node_modules/]
     }
   }
 });
