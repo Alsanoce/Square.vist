@@ -74,7 +74,7 @@ export default function DonateForm() {
     try {
       const response = await axios.post("https://api.saniah.ly/pay", {
         customer: cleanedPhone,
-        amount: amount,
+        quantity,
         mosque: selectedMosque,
       });
 
