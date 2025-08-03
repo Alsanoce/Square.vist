@@ -61,7 +61,8 @@ export default function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
+    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, ""));
+
     if (!validateInputs(cleanedPhone)) return;
 
     setIsLoading(true);
