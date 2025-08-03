@@ -38,7 +38,7 @@ export default function DonateForm() {
   };
 
   const validateInputs = (phone) => {
-    const phoneRegex = /^\+2189\d{7}$/;
+    const phoneRegex = /^\+2189\d{8}$/;
 
     if (!selectedMosque || !phone || quantity < 1) {
       setStatus("❗ الرجاء تعبئة جميع الحقول المطلوبة");
@@ -61,7 +61,7 @@ export default function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 8);
+    const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
 
     if (!validateInputs(cleanedPhone)) return;
 
@@ -151,7 +151,7 @@ export default function DonateForm() {
               value={phone}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^\d]/g, "");
-                if (val.length <= 8) setPhone(val);
+                if (val.length <= 9) setPhone(val);
               }}
               disabled={isLoading}
             />
