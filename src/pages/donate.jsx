@@ -46,7 +46,7 @@ export default function DonateForm() {
     }
 
     if (!phoneRegex.test(phone)) {
-      setStatus("❗ رقم الهاتف يجب أن يبدأ بـ +2189 ويتكون من 12 رقم");
+      setStatus("❗ رقم الهاتف يجب أن يبدأ بـ +2189 ويتكون من 9 أرقام");
       return false;
     }
 
@@ -62,7 +62,6 @@ export default function DonateForm() {
     if (isLoading) return;
 
     const cleanedPhone = "+218" + convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
-
     if (!validateInputs(cleanedPhone)) return;
 
     setIsLoading(true);
@@ -72,7 +71,7 @@ export default function DonateForm() {
       const response = await axios.post("https://api.saniah.ly/pay", {
         customer: cleanedPhone,
         quantity,
-        mosque: selectedMosque
+        mosque: selectedMosque,
       });
 
       const sessionID = (response.data.sessionID || "").toString().trim();
@@ -94,7 +93,7 @@ export default function DonateForm() {
 
       const otpResponse = await axios.post("https://api.saniah.ly/send-otp", {
         phone: cleanedPhone,
-        sessionID
+        sessionID,
       });
 
       if (otpResponse.data.success) {
@@ -103,8 +102,8 @@ export default function DonateForm() {
             phone: cleanedPhone,
             quantity,
             mosque: selectedMosque,
-            sessionID
-          }
+            sessionID,
+          },
         });
       } else {
         setStatus("❌ تمت العملية ولكن لم يتم إرسال الكود");
@@ -146,7 +145,7 @@ export default function DonateForm() {
             <span className="p-2 bg-gray-100 border rounded-r-none">+218</span>
             <input
               type="tel"
-              placeholder="9XXXXXXX"
+              placeholder="9XXXXXXXX"
               className="flex-1 p-2 border rounded-l-none"
               value={phone}
               onChange={(e) => {
@@ -182,13 +181,11 @@ export default function DonateForm() {
         </button>
 
         {status && (
-          <div
-            className={`p-2 text-center rounded ${
-              status.includes("❌") ? "bg-red-100 text-red-700" :
-              status.includes("❗") ? "bg-yellow-100 text-yellow-700" :
-              "bg-green-100 text-green-700"
-            }`}
-          >
+          <div className={`p-2 text-center rounded ${
+            status.includes("❌") ? "bg-red-100 text-red-700" :
+            status.includes("❗") ? "bg-yellow-100 text-yellow-700" :
+            "bg-green-100 text-green-700"
+          }`}>
             {status}
           </div>
         )}
