@@ -71,6 +71,13 @@ export default function DonateForm() {
 
     setIsLoading(true);
     setStatus(null);
+    console.log("📤 إرسال بيانات الدفع:", {
+    customer: fullPhoneNumber,
+   amount,
+   mosque: selectedMosque,
+   quantity,
+});
+
 
     try {
       const response = await axios.post("https://api.saniah.ly/pay", {
