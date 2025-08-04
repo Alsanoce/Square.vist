@@ -1,4 +1,3 @@
-
 // ✅ DonateForm.jsx (Front-end)
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -37,11 +36,26 @@ export default function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleanedPhone = phone.trim(); // ⚠️ تأكد أن المستخدم يدخل +218 بنفسه
-    const phoneRegex = /^\+2189\d{8}$/;
+    // تنظيف رقم الهاتف: إزالة المسافات والتحقق من التنسيق
+    let cleanedPhone = phone.trim().replace(/\s/g, "");
+    
+    // إضافة +218 تلقائياً إذا نسيها المستخدم
+    if (!cleanedPhone.startsWith("+218") && cleanedPhone.length === 9) {
+      cleanedPhone = `+218${cleanedPhone}`;
+    }
+    // معالجة التنسيق 0912345678
+    else if (cleanedPhone.startsWith("09") && cleanedPhone.length === 10) {
+      cleanedPhone = `+218${cleanedPhone.substring(1)}`;
+    }
+    // معالجة التنسيق 218912345678
+    else if (cleanedPhone.startsWith("218") && cleanedPhone.length === 12) {
+      cleanedPhone = `+${cleanedPhone}`;
+    }
 
+    // تحقق من صحة الرقم بعد التصحيح
+    const phoneRegex = /^\+2189\d{8}$/;
     if (!selectedMosque || !phoneRegex.test(cleanedPhone)) {
-      setStatus("❗ تأكد من تعبئة البيانات بشكل صحيح");
+      setStatus("❗ تأكد من تعبئة البيانات بشكل صحيح (رقم الهاتف يجب أن يكون +218 متبوعًا بـ 9 أرقام)");
       return;
     }
 
@@ -76,7 +90,12 @@ export default function DonateForm() {
 
     } catch (error) {
       console.error("❌ فشل:", error);
-      setStatus("❌ فشل في إتمام العملية، الرجاء المحاولة لاحقًا");
+      // تحسين رسالة الخطأ للمستخدم
+      if (error.response && error.response.data && error.response.data.error) {
+        setStatus(`❌ ${error.response.data.error}`);
+      } else {
+        setStatus("❌ فشل في إتمام العملية، الرجاء المحاولة لاحقًا");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +126,23 @@ export default function DonateForm() {
           <input
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              // السماح فقط بالأرقام وعلامة '+'
+              let value = e.target.value;
+              
+              // إذا بدأ بـ '+' نسمح فقط بالأرقام بعده
+              if (value.startsWith('+')) {
+                value = '+' + value.substring(1).replace(/[^0-9]/g, '');
+              } 
+              // إذا لم يبدأ بـ '+' نزيل كل ما ليس رقمًا
+              else {
+                value = value.replace(/[^0-9]/g, '');
+              }
+              
+              // منع كتابة أكثر من 13 حرف (+218XXXXXXXXX)
+              if (value.length <= 13) setPhone(value);
+            }}
+            placeholder="+218912345678"
             className="w-full p-2 border rounded"
             disabled={isLoading}
           />
