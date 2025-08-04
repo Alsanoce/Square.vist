@@ -1,3 +1,5 @@
+
+// ✅ DonateForm.jsx (Front-end)
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
@@ -5,13 +7,12 @@ import { db } from "../firebase";
 import axios from "axios";
 
 export default function DonateForm() {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+218");
   const [quantity, setQuantity] = useState(1);
   const [status, setStatus] = useState(null);
   const [mosques, setMosques] = useState([]);
   const [selectedMosque, setSelectedMosque] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
   const navigate = useNavigate();
   const pricePerStick = 6;
 
@@ -33,55 +34,25 @@ export default function DonateForm() {
     fetchMosques();
   }, []);
 
-  const convertDigits = (input) => {
-    const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
-    return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d));
-  };
-
-  const validateInputs = (phoneNumber) => {
-    const phoneRegex = /^9\d{8}$/;
-
-    if (!selectedMosque || !phoneNumber || quantity < 1) {
-      setStatus("❗ الرجاء تعبئة جميع الحقول المطلوبة");
-      return false;
-    }
-
-    if (!phoneRegex.test(phoneNumber)) {
-      setStatus("❗ رقم الهاتف يجب أن يبدأ بـ 9 ويتكون من 9 أرقام");
-      return false;
-    }
-
-    if (quantity < 1 || quantity > 50) {
-      setStatus("❗ عدد الأستيكات يجب أن يكون بين 1 و50");
-      return false;
-    }
-
-    return true;
-  };
-
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleanedPhone = convertDigits(phone.trim().replace(/\D/g, ""));
+    const cleanedPhone = phone.trim(); // ⚠️ تأكد أن المستخدم يدخل +218 بنفسه
+    const phoneRegex = /^\+2189\d{8}$/;
 
-    if (!validateInputs(cleanedPhone)) return;
+    if (!selectedMosque || !phoneRegex.test(cleanedPhone)) {
+      setStatus("❗ تأكد من تعبئة البيانات بشكل صحيح");
+      return;
+    }
 
     const amount = quantity * pricePerStick;
-    const fullPhoneNumber = `+218${cleanedPhone}`; // نضيف +218 هنا فقط عند الإرسال للAPI
-
     setIsLoading(true);
     setStatus(null);
-    console.log("📤 إرسال بيانات الدفع:", {
-    customer: fullPhoneNumber,
-   amount,
-   mosque: selectedMosque,
-   quantity,
-});
-
 
     try {
+      console.log("📤 إرسال:", { customer: cleanedPhone, amount, mosque: selectedMosque, quantity });
       const response = await axios.post("https://api.saniah.ly/pay", {
-        customer: fullPhoneNumber,
+        customer: cleanedPhone,
         amount,
         mosque: selectedMosque,
         quantity,
@@ -89,41 +60,22 @@ export default function DonateForm() {
 
       const sessionID = (response.data.sessionID || "").toString().trim();
 
-      if (sessionID === "BAL") {
-        setStatus("❌ الرصيد غير كافي لاتمام العملية");
-        return;
-      }
-
-      if (sessionID === "ACC") {
-        setStatus("❌ الرقم غير مفعل في خدمة الدفع");
-        return;
-      }
-
       if (!sessionID || sessionID.length < 10) {
-        setStatus("❌ استجابة غير متوقعة من نظام الدفع");
+        setStatus("❌ استجابة غير متوقعة من المصرف");
         return;
       }
 
-      const otpResponse = await axios.post("https://api.saniah.ly/send-otp", {
-        phone: fullPhoneNumber,
-        sessionID,
+      navigate("/confirm", {
+        state: {
+          phone: cleanedPhone,
+          quantity,
+          mosque: selectedMosque,
+          sessionID,
+        },
       });
 
-      if (otpResponse.data.success) {
-        navigate("/confirm", {
-          state: {
-            phone: fullPhoneNumber,
-            quantity,
-            mosque: selectedMosque,
-            sessionID,
-          },
-        });
-      } else {
-        setStatus("❌ تمت العملية ولكن لم يتم إرسال الكود");
-      }
-
     } catch (error) {
-      console.error("خطأ في عملية الدفع:", error);
+      console.error("❌ فشل:", error);
       setStatus("❌ فشل في إتمام العملية، الرجاء المحاولة لاحقًا");
     } finally {
       setIsLoading(false);
@@ -145,39 +97,31 @@ export default function DonateForm() {
           >
             <option value="">-- اختر مسجد --</option>
             {mosques.map((mosque) => (
-              <option key={mosque.id} value={mosque.name}>
-                {mosque.name}
-              </option>
+              <option key={mosque.id} value={mosque.name}>{mosque.name}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block mb-1">رقم الهاتف (9 خانات تبدأ بـ 9):</label>
-          <div className="flex">
-            <input
-              type="tel"
-              placeholder="9XXXXXXXX"
-              className="w-full p-2 border rounded"
-              value={phone}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^\d]/g, "");
-                if (val.length <= 9) setPhone(val);
-              }}
-              disabled={isLoading}
-            />
-          </div>
+          <label className="block mb-1">رقم الهاتف (+2189...):</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full p-2 border rounded"
+            disabled={isLoading}
+          />
         </div>
 
         <div>
-          <label className="block mb-1">عدد الأستيكات (1-50):</label>
+          <label className="block mb-1">عدد الأستيكات:</label>
           <input
             type="number"
-            min="1"
-            max="50"
-            className="w-full p-2 border rounded"
             value={quantity}
+            min={1}
+            max={50}
             onChange={(e) => setQuantity(Number(e.target.value))}
+            className="w-full p-2 border rounded"
             disabled={isLoading}
           />
         </div>
@@ -185,22 +129,12 @@ export default function DonateForm() {
         <button
           onClick={handleDonate}
           disabled={isLoading}
-          className={`w-full py-2 rounded text-white ${
-            isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
-          }`}
+          className={`w-full py-2 rounded text-white ${isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}
         >
           {isLoading ? "جاري المعالجة..." : "التبرع الآن"}
         </button>
 
-        {status && (
-          <div className={`p-2 text-center rounded ${
-            status.includes("❌") ? "bg-red-100 text-red-700" :
-            status.includes("❗") ? "bg-yellow-100 text-yellow-700" :
-            "bg-green-100 text-green-700"
-          }`}>
-            {status}
-          </div>
-        )}
+        {status && <div className="p-2 text-center bg-red-100 text-red-700 rounded">{status}</div>}
       </div>
     </div>
   );
