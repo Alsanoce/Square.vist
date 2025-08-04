@@ -38,16 +38,16 @@ export default function DonateForm() {
     return input.replace(/[٠-٩]/g, (d) => arabicDigits.indexOf(d));
   };
 
-  const validateInputs = (fullPhone) => {
+  const validateInputs = (phoneNumber) => {
     const phoneRegex = /^\+2189\d{8}$/;
 
-    if (!selectedMosque || !fullPhone || quantity < 1) {
+    if (!selectedMosque || !phoneNumber || quantity < 1) {
       setStatus("❗ الرجاء تعبئة جميع الحقول المطلوبة");
       return false;
     }
 
-    if (!phoneRegex.test(fullPhone)) {
-      setStatus("❗ رقم الهاتف يجب أن يبدأ بـ +2189 ويتكون من 9 أرقام");
+    if (!phoneRegex.test(phoneNumber)) {
+      setStatus("❗ رقم الهاتف يجب أن يبدأ بـ +2189 ويتكون من 12 رقمًا (بما في ذلك +218)");
       return false;
     }
 
@@ -62,10 +62,9 @@ export default function DonateForm() {
   const handleDonate = async () => {
     if (isLoading) return;
 
-    const cleaned = convertDigits(phone.trim().replace(/\D/g, "")).slice(0, 9);
-    const fullPhone = "+218" + cleaned;
+    const cleanedPhone = convertDigits(phone.trim());
 
-    if (!validateInputs(fullPhone)) return;
+    if (!validateInputs(cleanedPhone)) return;
 
     const amount = quantity * pricePerStick;
 
@@ -74,7 +73,7 @@ export default function DonateForm() {
 
     try {
       const response = await axios.post("https://api.saniah.ly/pay", {
-        customer: fullPhone,
+        customer: cleanedPhone,
         amount,
         mosque: selectedMosque,
         quantity,
@@ -98,14 +97,14 @@ export default function DonateForm() {
       }
 
       const otpResponse = await axios.post("https://api.saniah.ly/send-otp", {
-        phone: fullPhone,
+        phone: cleanedPhone,
         sessionID,
       });
 
       if (otpResponse.data.success) {
         navigate("/confirm", {
           state: {
-            phone: fullPhone,
+            phone: cleanedPhone,
             quantity,
             mosque: selectedMosque,
             sessionID,
@@ -146,21 +145,15 @@ export default function DonateForm() {
         </div>
 
         <div>
-          <label className="block mb-1">رقم الهاتف:</label>
-          <div className="flex">
-            <span className="p-2 bg-gray-100 border rounded-r-none">+218</span>
-            <input
-              type="tel"
-              placeholder="9XXXXXXXX"
-              className="flex-1 p-2 border rounded-l-none"
-              value={phone}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^\d]/g, "");
-                if (val.length <= 9) setPhone(val);
-              }}
-              disabled={isLoading}
-            />
-          </div>
+          <label className="block mb-1">رقم الهاتف (بما في ذلك +218):</label>
+          <input
+            type="tel"
+            placeholder="+2189XXXXXXXX"
+            className="w-full p-2 border rounded"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={isLoading}
+          />
         </div>
 
         <div>
