@@ -5,10 +5,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      'uuid': 'uuid/dist/esm-browser/index.js'
+      'uuid': 'uuid/dist/esm-node/index.js' // تغيير المسار هنا
     }
-  },
-  optimizeDeps: {
-    include: ['uuid']
   }
 })
