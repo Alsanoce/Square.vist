@@ -1,7 +1,0 @@
-[build]
-  command = "npm install && npm run build"
-  publish = "dist"
-
-[build.environment]
-  NODE_VERSION = "18"  # أو أي إصدار تدعمه حزمك
-  NPM_FLAGS = "--legacy-peer-deps"  # اختياري إذا واجهت مشاكل في التبعيات
