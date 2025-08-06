@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { v4 as uuidv4 } from 'uuid/dist/esm-node/index.js'
+import { v4 as uuidv4 } from 'uuid';
 const DonationForm = () => {
   const [phone, setPhone] = useState('+218');
   const [amount, setAmount] = useState(6);
