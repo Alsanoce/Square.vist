@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
+
 const DonationForm = () => {
   const [phone, setPhone] = useState('+218');
   const [amount, setAmount] = useState(6);
@@ -11,20 +12,39 @@ const DonationForm = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  // دالة لتحويل الأرقام الهندية إلى عربية
+  const convertToEnglishDigits = (input) => {
+    return input.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      // Basic validation
-      if (!phone.startsWith('+218') || phone.length !== 12) {
-        throw new Error('رقم الهاتف يجب أن يكون +218 متبوعًا بـ 9 أرقام');
+      // تنظيف الرقم من الفراغات وتحويل الأرقام الهندية
+      const cleanedPhone = convertToEnglishDigits(phone).replace(/\s+/g, '').trim();
+
+      // تحقق من رقم الهاتف
+      if (!/^\+2189\d{8}$/.test(cleanedPhone)) {
+        setError('رقم الهاتف يجب أن يكون +218 متبوعًا بـ 9 أرقام');
+        setIsLoading(false);
+        return;
       }
 
+      // تحقق من المسجد
+      if (!mosque) {
+        setError('يرجى اختيار المسجد');
+        setIsLoading(false);
+        return;
+      }
+
+      const totalAmount = amount * quantity;
+
       const response = await axios.post('https://api.saniah.ly/api/pay', {
-        customer: phone,
-        amount: amount * quantity,
+        customer: cleanedPhone,
+        amount: totalAmount,
         mosque,
         quantity
       }, {
@@ -38,8 +58,8 @@ const DonationForm = () => {
         navigate('/confirmation', {
           state: {
             sessionID: response.data.sessionID,
-            phone: response.data.phone,
-            amount: amount * quantity
+            phone: cleanedPhone,
+            amount: totalAmount
           }
         });
       } else {
@@ -52,8 +72,8 @@ const DonationForm = () => {
       });
 
       setError(
-        err.response?.data?.error || 
-        err.message || 
+        err.response?.data?.error ||
+        err.message ||
         'تعذر الاتصال بالخادم. يرجى المحاولة لاحقًا'
       );
     } finally {
@@ -64,7 +84,7 @@ const DonationForm = () => {
   return (
     <div className="donation-form">
       <h2>نموذج التبرع</h2>
-      
+
       {error && (
         <div className="alert alert-danger">
           {error}
@@ -112,8 +132,8 @@ const DonationForm = () => {
           المبلغ الإجمالي: {amount * quantity} دينار
         </div>
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={isLoading}
           className={isLoading ? 'loading' : ''}
         >
