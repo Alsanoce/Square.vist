@@ -4,6 +4,7 @@ import "./styles/global.css";
 import Navbar               from "./components/Navbar";
 import Home                 from "./pages/home";
 import Donate               from "./pages/donate";
+import Payment              from "./pages/Payment";
 import OtpConfirmationPage  from "./pages/OtpConfirmationPage";
 import { ThankYou, About }  from "./pages/ThankYouAndAbout";
 
@@ -14,6 +15,7 @@ function App() {
       <Routes>
         <Route path="/"          element={<Home />}                />
         <Route path="/donate"    element={<Donate />}             />
+        <Route path="/payment"   element={<Payment />}            />
         <Route path="/confirm"   element={<OtpConfirmationPage />} />
         <Route path="/thank-you" element={<ThankYou />}           />
         <Route path="/about"     element={<About />}              />

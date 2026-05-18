@@ -34,11 +34,14 @@ export default function OtpConfirmationPage() {
 
   const saveDonation = async () => {
     await addDoc(collection(db, "donations"), {
+      donorName: state.donorName || "",
       phone: state.phone,
-      amount: state.quantity,
+      amount: state.amount,
+      quantity: state.quantity,
       mosque: state.mosque,
       mosqueAddress: state.mosqueAddress || "",
       mosqueLocation: state.mosqueLocation || "",
+      paymentMethod: state.paymentMethod || "أدفع لي",
       sessionID: state.sessionID,
       country: "ليبيا",
       timestamp: new Date(),

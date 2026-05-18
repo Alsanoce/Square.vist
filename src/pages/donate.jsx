@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
 
 const PRICE_PER_BOX = 6;
 
@@ -10,13 +8,13 @@ function convertToEnglishDigits(input) {
 }
 
 export default function Donate() {
-  const [phone, setPhone]       = useState("+218");
+  const [donorName, setDonorName] = useState("");
+  const [phone, setPhone]       = useState("");
   const [mosque, setMosque]     = useState("");
   const [mosqueAddress, setMosqueAddress] = useState("");
   const [mosqueLocation, setMosqueLocation] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError]       = useState("");
   const navigate = useNavigate();
 
@@ -61,77 +59,52 @@ export default function Donate() {
     );
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     setError("");
-    setIsLoading(true);
 
-    try {
-      const cleanedPhone = convertToEnglishDigits(phone).replace(/\s+/g, "").trim();
+    const name = donorName.trim();
+    const cleanedPhone = convertToEnglishDigits(phone).replace(/\D/g, "").trim();
+    const mosqueName = mosque.trim();
+    const address = mosqueAddress.trim();
+    const location = mosqueLocation.trim();
 
-      if (!/^\+2189\d{8}$/.test(cleanedPhone)) {
-        setError("رقم الهاتف يجب أن يكون +218 متبوعًا بـ 9 أرقام تبدأ بـ 9");
-        setIsLoading(false);
-        return;
-      }
-
-      const mosqueName = mosque.trim();
-      const address = mosqueAddress.trim();
-      const location = mosqueLocation.trim();
-
-      if (!mosqueName) {
-        setError("يرجى كتابة اسم المسجد");
-        setIsLoading(false);
-        return;
-      }
-
-      if (!address) {
-        setError("يرجى كتابة عنوان المسجد");
-        setIsLoading(false);
-        return;
-      }
-
-      if (!location) {
-        setError("يرجى الضغط على زر استخدام موقعي الحالي لإضافة موقع المسجد");
-        setIsLoading(false);
-        return;
-      }
-
-      if (!/^https?:\/\/.+/i.test(location)) {
-        setError("رابط الموقع يجب أن يبدأ بـ http أو https");
-        setIsLoading(false);
-        return;
-      }
-
-      const response = await axios.post(
-        "https://api.saniah.ly/api/pay",
-        { customer: cleanedPhone, amount: total, mosque: mosqueName, quantity },
-        { headers: { "X-Request-ID": uuidv4() }, timeout: 20000 }
-      );
-
-      if (response.data.success) {
-        navigate("/confirm", {
-          state: {
-            sessionID: response.data.sessionID,
-            phone: cleanedPhone,
-            amount: total,
-            quantity,
-            mosque: mosqueName,
-            mosqueAddress: address,
-            mosqueLocation: location,
-          },
-        });
-      } else {
-        setError(response.data.error || "حدث خطأ أثناء المعالجة");
-      }
-    } catch (err) {
-      setError(
-        err.response?.data?.error ||
-        err.message ||
-        "تعذر الاتصال بالخادم. يرجى المحاولة لاحقًا"
-      );
-    } finally {
-      setIsLoading(false);
+    if (!name) {
+      setError("يرجى كتابة اسم المتبرع");
+      return;
     }
+
+    if (!/^9\d{8}$/.test(cleanedPhone)) {
+      setError("رقم الواتساب يجب أن يكون 9 أرقام ويبدأ بـ 9، بدون +218");
+      return;
+    }
+
+    if (!mosqueName) {
+      setError("يرجى كتابة اسم المسجد");
+      return;
+    }
+
+    if (!address) {
+      setError("يرجى كتابة عنوان المسجد");
+      return;
+    }
+
+    if (!location) {
+      setError("يرجى الضغط على زر استخدام موقعي الحالي لإضافة موقع المسجد");
+      return;
+    }
+
+    navigate("/payment", {
+      state: {
+        donorName: name,
+        phone: `+218${cleanedPhone}`,
+        whatsapp: cleanedPhone,
+        amount: total,
+        quantity,
+        mosque: mosqueName,
+        mosqueAddress: address,
+        mosqueLocation: location,
+      },
+    });
   };
 
   return (
@@ -161,16 +134,28 @@ export default function Donate() {
             </div>
           </div>
 
+          {/* Donor */}
+          <div className="form-group">
+            <label>اسم المتبرع</label>
+            <input
+              type="text"
+              value={donorName}
+              onChange={(e) => setDonorName(e.target.value)}
+              placeholder="اكتب اسمك"
+            />
+          </div>
+
           {/* Phone */}
           <div className="form-group">
-            <label>رقم الهاتف (مصرف التجارة)</label>
+            <label>رقم الواتساب</label>
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+218912345678"
+              onChange={(e) => setPhone(convertToEnglishDigits(e.target.value).replace(/\D/g, "").slice(0, 9))}
+              placeholder="912345678"
               dir="ltr"
             />
+            <p style={s.fieldHint}>اكتب الرقم بدون +218.</p>
           </div>
 
           {/* Mosque */}
@@ -251,18 +236,13 @@ export default function Donate() {
           <button
             className="btn-primary"
             onClick={handleSubmit}
-            disabled={isLoading}
             style={{ marginTop: "0.5rem" }}
           >
-            {isLoading ? (
-              <><span className="spinner" /> جاري المعالجة...</>
-            ) : (
-              "💧 أرسل طلب التبرع"
-            )}
+            المتابعة إلى الدفع
           </button>
 
           <p style={s.note}>
-            ستصلك رسالة OTP على هاتفك لتأكيد الدفع
+            في الخطوة التالية اختر طريقة الدفع المناسبة لك.
           </p>
         </div>
 
