@@ -224,7 +224,7 @@ function handleOnlineConfTrans(e) {
   const bank = callBank("OnlineConfTrans", xml);
   const result = extractTag(bank.raw, "OnlineConfTransResult");
   const fault = extractTag(bank.raw, "faultstring");
-  const ok = /^OK$/i.test(String(result || "").trim());
+  const ok = /(^|\W)OK(\W|$)/i.test(String(result || "").trim());
 
   logTransaction({
     action: "onlineConfTrans",
