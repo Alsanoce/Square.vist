@@ -1,6 +1,6 @@
 const EDFAALY_ENDPOINT =
   import.meta.env.VITE_EDFAALY_ENDPOINT ||
-  "https://script.google.com/macros/s/AKfycby6LMy5zoKS3YNrPEwqt270sBxuGK5l7B1lXtUSfx4r8p5fjmNgSrfdYgnPZe7KPhFSsg/exec";
+  "https://script.google.com/macros/s/AKfycbz5GAkhYDAv58ve1UuFA5s7eRKyI46y4p2wfE8CJ1dcnoEs1hgYCiNLSFKjXHD35nIdjg/exec";
 
 function buildUrl(action, params) {
   const callback = `edfaalyCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
