@@ -14,6 +14,7 @@ export default function Donate() {
   const [mosque, setMosque]     = useState("");
   const [mosqueAddress, setMosqueAddress] = useState("");
   const [mosqueLocation, setMosqueLocation] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]       = useState("");
@@ -23,6 +24,41 @@ export default function Donate() {
 
   const changeQty = (delta) => {
     setQuantity((q) => Math.max(1, Math.min(100, q + delta)));
+  };
+
+  const getMapsSearchUrl = () => {
+    const query = [mosque.trim(), mosqueAddress.trim(), "بنغازي", "ليبيا"]
+      .filter(Boolean)
+      .join(" ");
+
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || "مساجد بنغازي ليبيا")}`;
+  };
+
+  const openGoogleMaps = () => {
+    window.open(getMapsSearchUrl(), "_blank", "noopener,noreferrer");
+  };
+
+  const useCurrentLocation = () => {
+    setError("");
+
+    if (!navigator.geolocation) {
+      setError("المتصفح لا يدعم تحديد الموقع. يمكنك فتح خرائط Google وإرسال العنوان يدويًا.");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const { latitude, longitude } = coords;
+        setMosqueLocation(`https://www.google.com/maps?q=${latitude},${longitude}`);
+        setIsLocating(false);
+      },
+      () => {
+        setError("تعذر تحديد الموقع. تأكد من السماح للموقع باستخدام موقعك.");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const handleSubmit = async () => {
@@ -55,7 +91,7 @@ export default function Donate() {
       }
 
       if (!location) {
-        setError("يرجى إضافة رابط موقع المسجد من خرائط Google");
+        setError("يرجى الضغط على زر استخدام موقعي الحالي لإضافة موقع المسجد");
         setIsLoading(false);
         return;
       }
@@ -160,15 +196,35 @@ export default function Donate() {
 
           <div className="form-group">
             <label>موقع المسجد على خرائط Google</label>
-            <input
-              type="url"
-              value={mosqueLocation}
-              onChange={(e) => setMosqueLocation(e.target.value)}
-              placeholder="https://maps.google.com/..."
-              dir="ltr"
-            />
+            <div style={s.locationActions}>
+              <button
+                type="button"
+                onClick={useCurrentLocation}
+                disabled={isLocating}
+                style={s.locationButton}
+              >
+                {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
+              </button>
+              <button
+                type="button"
+                onClick={openGoogleMaps}
+                style={s.mapButton}
+              >
+                افتح خرائط Google
+              </button>
+            </div>
+            {mosqueLocation && (
+              <a
+                href={mosqueLocation}
+                target="_blank"
+                rel="noreferrer"
+                style={s.locationLink}
+              >
+                تم تحديد الموقع - عرض على الخريطة
+              </a>
+            )}
             <p style={s.fieldHint}>
-              افتح Google Maps، اختر المسجد أو المكان، ثم انسخ رابط المشاركة هنا.
+              عند الضغط على استخدام موقعي الحالي سيطلب المتصفح السماح بتحديد الموقع.
             </p>
           </div>
 
@@ -246,6 +302,43 @@ const s = {
     fontSize: "0.78rem",
     lineHeight: 1.7,
     marginTop: "0.45rem",
+  },
+  locationActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "0.75rem",
+  },
+  locationButton: {
+    minHeight: 46,
+    border: "none",
+    borderRadius: 12,
+    background: "linear-gradient(135deg, var(--blue-bright), var(--cyan))",
+    color: "#fff",
+    fontFamily: "'Tajawal', sans-serif",
+    fontSize: "0.9rem",
+    fontWeight: 700,
+    cursor: "pointer",
+    padding: "0.75rem",
+  },
+  mapButton: {
+    minHeight: 46,
+    border: "1px solid rgba(0,212,255,0.3)",
+    borderRadius: 12,
+    background: "rgba(255,255,255,0.04)",
+    color: "var(--cyan)",
+    fontFamily: "'Tajawal', sans-serif",
+    fontSize: "0.9rem",
+    fontWeight: 700,
+    cursor: "pointer",
+    padding: "0.75rem",
+  },
+  locationLink: {
+    display: "block",
+    color: "var(--success)",
+    fontSize: "0.84rem",
+    fontWeight: 700,
+    marginTop: "0.65rem",
+    textDecoration: "none",
   },
 
   note: {
