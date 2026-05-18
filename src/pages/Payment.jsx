@@ -10,11 +10,13 @@ const METHODS = [
     id: "edfaaly",
     title: "أدفع لي",
     description: "دفع إلكتروني مباشر مع رسالة تأكيد OTP.",
+    icon: "/payment-icons/adfa3ly.png",
   },
   {
     id: "mobicash",
     title: "موبي كاش",
     description: "نسجل طلبك ونتواصل معك على واتساب لإتمام الدفع.",
+    icon: "/payment-icons/mobicash.png",
   },
   {
     id: "bank",
@@ -136,8 +138,15 @@ export default function Payment() {
                   ...(selected === method.id ? s.methodButtonActive : {}),
                 }}
               >
-                <strong>{method.title}</strong>
-                <span>{method.description}</span>
+                {method.icon ? (
+                  <img src={method.icon} alt="" style={s.methodIcon} />
+                ) : (
+                  <span style={s.bankIcon}>ح</span>
+                )}
+                <span style={s.methodText}>
+                  <strong>{method.title}</strong>
+                  <span>{method.description}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -199,6 +208,9 @@ const s = {
   methodButton: {
     width: "100%",
     textAlign: "right",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.9rem",
     border: "1px solid rgba(0,212,255,0.18)",
     borderRadius: 12,
     background: "rgba(255,255,255,0.04)",
@@ -206,6 +218,34 @@ const s = {
     padding: "1rem",
     cursor: "pointer",
     fontFamily: "'Tajawal', sans-serif",
+  },
+  methodIcon: {
+    width: 56,
+    height: 56,
+    objectFit: "contain",
+    borderRadius: 10,
+    background: "rgba(255,255,255,0.92)",
+    padding: "0.35rem",
+    flexShrink: 0,
+  },
+  bankIcon: {
+    width: 56,
+    height: 56,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    background: "rgba(0,212,255,0.1)",
+    border: "1px solid rgba(0,212,255,0.24)",
+    color: "var(--cyan)",
+    fontFamily: "'Cairo', sans-serif",
+    fontSize: "1.4rem",
+    fontWeight: 900,
+    flexShrink: 0,
+  },
+  methodText: {
+    display: "grid",
+    gap: "0.3rem",
   },
   methodButtonActive: {
     borderColor: "var(--cyan)",
