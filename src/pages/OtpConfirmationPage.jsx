@@ -5,34 +5,26 @@ import { db } from "../firebase";
 import axios from "axios";
 import OtpInput from "react-otp-input";
 
-function OtpConfirmationPage() {
-  const [otp, setOtp] = useState("");
-  const [status, setStatus] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+export default function OtpConfirmationPage() {
+  const [otp, setOtp]                   = useState("");
+  const [status, setStatus]             = useState(null);
+  const [isLoading, setIsLoading]       = useState(false);
   const [resendDisabled, setResendDisabled] = useState(false);
-  const [countdown, setCountdown] = useState(60);
-  
-  const navigate = useNavigate();
-  const { state } = useLocation();
+  const [countdown, setCountdown]       = useState(60);
 
-  // تحميل بيانات التبرع أو إعادة التوجيه
+  const navigate      = useNavigate();
+  const { state }     = useLocation();
+
   useEffect(() => {
-    if (!state?.sessionID) {
-      navigate("/donate");
-    }
+    if (!state?.sessionID) navigate("/donate");
   }, [navigate, state]);
 
-  // العد التنازلي لإعادة الإرسال
   useEffect(() => {
     let timer;
     if (resendDisabled) {
       timer = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setResendDisabled(false);
-            return 60;
-          }
+        setCountdown((prev) => {
+          if (prev <= 1) { clearInterval(timer); setResendDisabled(false); return 60; }
           return prev - 1;
         });
       }, 1000);
@@ -40,156 +32,177 @@ function OtpConfirmationPage() {
     return () => clearInterval(timer);
   }, [resendDisabled]);
 
-  // حفظ بيانات التبرع في Firebase
   const saveDonation = async () => {
-    try {
-      await addDoc(collection(db, "donations"), {
-        phone: state.phone,
-        amount: state.quantity,
-        mosque: state.mosque,
-        sessionID: state.sessionID,
-        country: "ليبيا",
-        timestamp: new Date(),
-        status: "مكتمل",
-        otpVerified: true
-      });
-    } catch (error) {
-      console.error("خطأ في حفظ البيانات:", error);
-      throw error;
-    }
+    await addDoc(collection(db, "donations"), {
+      phone: state.phone,
+      amount: state.quantity,
+      mosque: state.mosque,
+      sessionID: state.sessionID,
+      country: "ليبيا",
+      timestamp: new Date(),
+      status: "مكتمل",
+      otpVerified: true,
+    });
   };
 
-  // إعادة إرسال كود OTP
   const handleResend = async () => {
     setResendDisabled(true);
-    setStatus("جاري إعادة إرسال الكود...");
-    
+    setStatus({ type: "info", msg: "جاري إعادة إرسال الكود..." });
     try {
       await axios.post("https://api.saniah.ly/resend-otp", {
-        phone: state.phone,
-        sessionID: state.sessionID,
-        countryCode: "LY"
+        phone: state.phone, sessionID: state.sessionID, countryCode: "LY",
       });
-      setStatus("✔ تم إرسال كود جديد");
-    } catch (error) {
-      setStatus("❌ فشل في إعادة الإرسال");
+      setStatus({ type: "success", msg: "✔ تم إرسال كود جديد" });
+    } catch {
+      setStatus({ type: "error", msg: "❌ فشل في إعادة الإرسال" });
     }
   };
 
-  // تأكيد الدفع
   const handleConfirm = async () => {
     if (isLoading) return;
     if (otp.length !== 4) {
-      setStatus("❗ الرجاء إدخال كود مكون من 4 أرقام");
+      setStatus({ type: "warning", msg: "❗ الرجاء إدخال كود مكون من 4 أرقام" });
       return;
     }
-
     setIsLoading(true);
     setStatus(null);
-
     try {
-      // التحقق من صحة الجلسة
-      const verifyRes = await axios.get(
-        `https://api.saniah.ly/verify/${state.sessionID}`
-      );
-      
+      const verifyRes = await axios.get(`https://api.saniah.ly/verify/${state.sessionID}`);
       if (!verifyRes.data.isValid) {
-        setStatus("❌ انتهت صلاحية الجلسة، يرجى البدء من جديد");
+        setStatus({ type: "error", msg: "❌ انتهت صلاحية الجلسة، يرجى البدء من جديد" });
         return;
       }
-
-      // تأكيد الدفع
       const confirmRes = await axios.post("https://api.saniah.ly/confirm", {
-        otp,
-        sessionID: state.sessionID,
-        phone: state.phone,
-        countryCode: "LY"
+        otp, sessionID: state.sessionID, phone: state.phone, countryCode: "LY",
       });
-
       if (confirmRes.data.success) {
         await saveDonation();
-        setStatus("✅ تمت العملية بنجاح");
+        setStatus({ type: "success", msg: "✅ تمت العملية بنجاح" });
         setTimeout(() => navigate("/thank-you"), 1500);
       } else {
-        setStatus(confirmRes.data.message || "❌ كود التأكيد غير صحيح");
+        setStatus({ type: "error", msg: confirmRes.data.message || "❌ كود التأكيد غير صحيح" });
       }
-    } catch (error) {
-      console.error("خطأ في التأكيد:", error);
-      setStatus("❌ حدث خطأ أثناء التأكيد");
+    } catch {
+      setStatus({ type: "error", msg: "❌ حدث خطأ أثناء التأكيد" });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold text-center mb-6">تأكيد الدفع</h1>
-      
-      <div className="text-center mb-6">
-        <p>تم إرسال كود التحقق إلى الرقم:</p>
-        <p className="font-bold">+{state?.phone}</p>
-      </div>
+    <div className="page-wrapper">
+      <div className="section" style={s.wrapper}>
 
-      {/* إدخال OTP */}
-      <div className="flex justify-center mb-6">
-        <OtpInput
-          value={otp}
-          onChange={setOtp}
-          numInputs={4}
-          renderInput={(props) => (
-            <input
-              {...props}
-              className="otp-input"
-              dir="ltr"
-            />
-          )}
-          containerStyle="gap-2"
-          inputStyle={{
-            width: '3rem',
-            height: '3.5rem',
-            fontSize: '1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-            textAlign: 'center'
-          }}
-          shouldAutoFocus
-        />
-      </div>
-
-      {/* زر التأكيد */}
-      <button
-        onClick={handleConfirm}
-        disabled={isLoading}
-        className={`w-full py-3 rounded text-white mb-3 ${
-          isLoading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
-        }`}
-      >
-        {isLoading ? "جاري التأكيد..." : "تأكيد الدفع"}
-      </button>
-
-      {/* إعادة إرسال الكود */}
-      <button
-        onClick={handleResend}
-        disabled={resendDisabled || isLoading}
-        className={`w-full py-2 ${
-          resendDisabled ? "text-gray-400" : "text-blue-600 hover:text-blue-800"
-        }`}
-      >
-        {resendDisabled ? `إعادة إرسال (${countdown})` : "إعادة إرسال الكود"}
-      </button>
-
-      {/* رسائل الحالة */}
-      {status && (
-        <div className={`mt-4 p-3 text-center rounded-lg ${
-          status.includes("❌") ? "bg-red-100 text-red-700" : 
-          status.includes("❗") ? "bg-yellow-100 text-yellow-700" : 
-          "bg-green-100 text-green-700"
-        }`}>
-          {status}
+        <div style={s.header}>
+          <div style={s.lockIcon}>🔐</div>
+          <span className="section-tag">تأكيد الدفع</span>
+          <h1 className="section-title">أدخل كود <span>التحقق</span></h1>
         </div>
-      )}
+
+        <div className="card" style={s.card}>
+
+          {/* Info */}
+          <div style={s.infoBox}>
+            <p style={s.infoText}>تم إرسال كود التحقق إلى الرقم:</p>
+            <p style={s.phoneDisplay}>{state?.phone}</p>
+          </div>
+
+          {/* OTP Input */}
+          <div style={{ display: "flex", justifyContent: "center", margin: "1.8rem 0" }}>
+            <OtpInput
+              value={otp}
+              onChange={setOtp}
+              numInputs={4}
+              renderInput={(props) => (
+                <input {...props} className="otp-single-input" dir="ltr" />
+              )}
+              containerStyle={{ gap: "0.8rem", direction: "ltr" }}
+              shouldAutoFocus
+            />
+          </div>
+
+          {/* Alert */}
+          {status && (
+            <div className={`alert ${
+              status.type === "error"   ? "alert-danger"  :
+              status.type === "warning" ? "alert-warning" : "alert-success"
+            }`}>
+              {status.msg}
+            </div>
+          )}
+
+          {/* Confirm */}
+          <button
+            className="btn-primary"
+            onClick={handleConfirm}
+            disabled={isLoading}
+            style={{ marginTop: "1.2rem" }}
+          >
+            {isLoading ? <><span className="spinner" /> جاري التأكيد...</> : "✅ تأكيد الدفع"}
+          </button>
+
+          {/* Resend */}
+          <button
+            onClick={handleResend}
+            disabled={resendDisabled || isLoading}
+            style={{
+              ...s.resendBtn,
+              color: resendDisabled ? "var(--text-muted)" : "var(--cyan)",
+              cursor: resendDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            {resendDisabled ? `إعادة إرسال (${countdown}s)` : "إعادة إرسال الكود"}
+          </button>
+
+          {/* Back */}
+          <button
+            onClick={() => navigate("/donate")}
+            style={s.backBtn}
+          >
+            ← العودة للتبرع
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default OtpConfirmationPage;
+const s = {
+  wrapper: { maxWidth: 480, margin: "0 auto" },
+  header:  { textAlign: "center", marginBottom: "2rem" },
+  lockIcon: { fontSize: "3rem", marginBottom: "0.8rem" },
+  card: { padding: "2.2rem" },
+
+  infoBox: {
+    textAlign: "center",
+    background: "rgba(0,212,255,0.06)",
+    border: "1px solid rgba(0,212,255,0.15)",
+    borderRadius: 14, padding: "1.2rem",
+    marginBottom: "0.5rem",
+  },
+  infoText: { color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "0.4rem" },
+  phoneDisplay: {
+    fontFamily: "'Cairo', sans-serif",
+    fontSize: "1.4rem", fontWeight: 800, color: "var(--cyan)",
+    direction: "ltr",
+  },
+
+  resendBtn: {
+    display: "block", width: "100%",
+    background: "transparent", border: "none",
+    fontFamily: "'Tajawal', sans-serif",
+    fontSize: "0.92rem", fontWeight: 600,
+    marginTop: "1rem", padding: "0.5rem",
+    textAlign: "center",
+    transition: "color 0.3s",
+  },
+  backBtn: {
+    display: "block", width: "100%",
+    background: "transparent", border: "none",
+    color: "var(--text-muted)",
+    fontFamily: "'Tajawal', sans-serif",
+    fontSize: "0.88rem", cursor: "pointer",
+    marginTop: "0.5rem", padding: "0.4rem",
+    textAlign: "center",
+  },
+};

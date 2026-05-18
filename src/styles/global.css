@@ -1,0 +1,314 @@
+/* ============================================
+   سقيا ماء — Global Design System
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Cairo:wght@300;400;600;700;900&display=swap');
+
+:root {
+  --blue-deep:   #0a1628;
+  --blue-mid:    #0d2545;
+  --blue-bright: #1a6fb5;
+  --blue-light:  #2a9fd6;
+  --blue-glow:   #4dc8f0;
+  --cyan:        #00d4ff;
+  --white:       #f0f8ff;
+  --cream:       #e8f4fd;
+  --gold:        #f0b429;
+  --text-muted:  #8ab4cc;
+  --danger:      #ff4d6d;
+  --success:     #00c896;
+  --warning:     #f0b429;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Tajawal', sans-serif;
+  background: var(--blue-deep);
+  color: var(--white);
+  direction: rtl;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3, h4 {
+  font-family: 'Cairo', sans-serif;
+  font-weight: 800;
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  background: linear-gradient(135deg, var(--blue-bright), var(--cyan));
+  color: #fff;
+  padding: 0.9rem 2rem;
+  border: none;
+  border-radius: 50px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+  box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+  text-decoration: none;
+  width: 100%;
+}
+
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,212,255,0.5); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--cyan);
+  padding: 0.9rem 2rem;
+  border: 2px solid rgba(0,212,255,0.4);
+  border-radius: 50px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+  text-decoration: none;
+  width: 100%;
+}
+
+.btn-secondary:hover { background: rgba(0,212,255,0.1); border-color: var(--cyan); }
+
+/* ===== CARD ===== */
+.card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 20px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+  transition: border-color 0.3s, transform 0.3s;
+}
+
+.card:hover { border-color: rgba(0,212,255,0.35); }
+
+/* ===== FORM ===== */
+.form-group { margin-bottom: 1.4rem; }
+
+.form-group label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 12px;
+  padding: 0.85rem 1.1rem;
+  color: var(--white);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  -webkit-appearance: none;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+}
+
+.form-group select option { background: var(--blue-mid); color: var(--white); }
+
+.form-group input::placeholder { color: rgba(138,180,204,0.5); }
+
+/* ===== ALERTS ===== */
+.alert {
+  padding: 0.9rem 1.2rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 1rem;
+}
+.alert-danger  { background: rgba(255,77,109,0.15); border: 1px solid rgba(255,77,109,0.3); color: #ff8fa3; }
+.alert-success { background: rgba(0,200,150,0.15); border: 1px solid rgba(0,200,150,0.3); color: #00c896; }
+.alert-warning { background: rgba(240,180,41,0.15); border: 1px solid rgba(240,180,41,0.3); color: var(--gold); }
+
+/* ===== SECTION ===== */
+.section {
+  padding: 5rem 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.section-tag {
+  display: inline-block;
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 0.7rem;
+}
+
+.section-title {
+  font-size: clamp(1.6rem, 4vw, 2.5rem);
+  font-weight: 900;
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+}
+
+.section-title span { color: var(--cyan); }
+
+/* ===== PAGE WRAPPER ===== */
+.page-wrapper {
+  min-height: 100vh;
+  padding-top: 80px;
+}
+
+/* ===== DIVIDER ===== */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.2), transparent);
+  margin: 0;
+}
+
+/* ===== QUANTITY CONTROL ===== */
+.qty-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qty-btn {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,212,255,0.3);
+  background: transparent;
+  color: var(--cyan);
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-family: 'Cairo', sans-serif;
+  flex-shrink: 0;
+}
+
+.qty-btn:hover { background: rgba(0,212,255,0.15); border-color: var(--cyan); }
+
+.qty-display {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--white);
+  min-width: 50px;
+  text-align: center;
+}
+
+/* ===== TOTAL BOX ===== */
+.total-box {
+  background: rgba(0,212,255,0.06);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 14px;
+  padding: 1rem 1.5rem;
+  text-align: center;
+  margin: 1.2rem 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.total-box strong {
+  color: var(--cyan);
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.4rem;
+}
+
+/* ===== OTP INPUT ===== */
+.otp-container {
+  display: flex;
+  justify-content: center;
+  gap: 0.8rem;
+  margin: 1.5rem 0;
+  direction: ltr;
+}
+
+.otp-single-input {
+  width: 56px !important;
+  height: 64px !important;
+  font-size: 1.6rem !important;
+  font-family: 'Cairo', sans-serif !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  border: 2px solid rgba(0,212,255,0.25) !important;
+  background: rgba(255,255,255,0.05) !important;
+  color: var(--white) !important;
+  text-align: center !important;
+  outline: none !important;
+  transition: border-color 0.3s, box-shadow 0.3s !important;
+}
+
+.otp-single-input:focus {
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 0 3px rgba(0,212,255,0.15) !important;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes float-up {
+  0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.5; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+}
+
+@keyframes wave-move {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.anim-fadeInUp { animation: fadeInUp 0.7s ease both; }
+.anim-delay-1  { animation-delay: 0.1s; }
+.anim-delay-2  { animation-delay: 0.2s; }
+.anim-delay-3  { animation-delay: 0.35s; }
+.anim-delay-4  { animation-delay: 0.5s; }
+
+/* ===== LOADING SPINNER ===== */
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .card { padding: 1.4rem; }
+  .section { padding: 3rem 1rem; }
+}
