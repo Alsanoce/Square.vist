@@ -4,6 +4,8 @@ import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { callEdfaaly } from "../lib/edfaalyApi";
 
+const PRICE_PER_BOX = 6;
+
 const METHOD_CONFIG = {
   edfaaly: {
     title: "أدفع لي",
@@ -45,6 +47,7 @@ export default function PaymentMethod() {
   const [paymentNumber, setPaymentNumber] = useState(method === "edfaaly" ? state?.whatsapp || "" : "");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const payableAmount = Number(state?.quantity || 1) * PRICE_PER_BOX;
 
   useEffect(() => {
     if (!config || !state?.phone || !state?.mosque) navigate("/donate");
@@ -85,9 +88,12 @@ export default function PaymentMethod() {
 
     const response = await callEdfaaly("doPTrans", {
       customerMobile: customer,
-      amount: state.amount,
-      originalAmount: state.amount,
-      totalAmount: state.amount,
+      amount: payableAmount,
+      decimalAmount: payableAmount,
+      originalAmount: payableAmount,
+      totalAmount: payableAmount,
+      unitPrice: PRICE_PER_BOX,
+      quantity: state.quantity,
       paymentMethod: config.paymentMethod,
       meterNumber: state.mosque,
       cardNumber: method === "mobicash" ? normalized : "",
@@ -101,6 +107,7 @@ export default function PaymentMethod() {
     navigate("/confirm", {
       state: {
         ...state,
+        amount: payableAmount,
         paymentPhone: customer,
         paymentNumber: normalized,
         sessionID: response.sessionID,
@@ -142,7 +149,7 @@ export default function PaymentMethod() {
         <div className="card" style={s.card}>
           <div style={s.amountBox}>
             <span>قيمة الدفع</span>
-            <strong>{state.amount} دينار</strong>
+            <strong>{payableAmount} دينار</strong>
           </div>
 
           <div className="form-group">

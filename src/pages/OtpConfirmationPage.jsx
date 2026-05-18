@@ -14,6 +14,7 @@ export default function OtpConfirmationPage() {
 
   const navigate      = useNavigate();
   const { state }     = useLocation();
+  const payableAmount = Number(state?.amount || 0);
 
   useEffect(() => {
     if (!state?.sessionID) navigate("/donate");
@@ -37,7 +38,7 @@ export default function OtpConfirmationPage() {
       donorName: state.donorName || "",
       phone: state.phone,
       paymentPhone: state.paymentPhone || "",
-      amount: state.amount,
+      amount: payableAmount,
       quantity: state.quantity,
       mosque: state.mosque,
       mosqueAddress: state.mosqueAddress || "",
@@ -70,8 +71,10 @@ export default function OtpConfirmationPage() {
         sessionID: state.sessionID,
         customerMobile: state.paymentPhone || state.phone,
         paymentMethod: state.paymentMethod || "أدفع لي",
-        originalAmount: state.amount,
-        totalAmount: state.amount,
+        amount: payableAmount,
+        decimalAmount: payableAmount,
+        originalAmount: payableAmount,
+        totalAmount: payableAmount,
         meterNumber: state.mosque,
       });
       if (confirmRes.success) {
