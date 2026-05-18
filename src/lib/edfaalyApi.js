@@ -1,6 +1,6 @@
 const EDFAALY_ENDPOINT =
   import.meta.env.VITE_EDFAALY_ENDPOINT ||
-  "https://script.google.com/macros/s/PUT_YOUR_DEPLOYMENT_ID_HERE/exec";
+  "https://script.google.com/macros/s/AKfycbx2q3FhAE-jV2BRoWTNrJdi-BmBSFWy9um49i8QGHkaO5EKDQ_2KloPe6GCfR-SPaCHHQ/exec";
 
 function buildUrl(action, params) {
   const callback = `edfaalyCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -17,10 +17,6 @@ function buildUrl(action, params) {
 }
 
 export function callEdfaaly(action, params = {}) {
-  if (EDFAALY_ENDPOINT.includes("PUT_YOUR_DEPLOYMENT_ID_HERE")) {
-    return Promise.reject(new Error("لم يتم ضبط رابط سيرفر أدفع لي بعد"));
-  }
-
   return new Promise((resolve, reject) => {
     const { callback, url } = buildUrl(action, params);
     const script = document.createElement("script");
