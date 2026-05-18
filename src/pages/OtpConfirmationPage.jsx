@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import axios from "axios";
 import OtpInput from "react-otp-input";
+import { callEdfaaly } from "../lib/edfaalyApi";
 
 export default function OtpConfirmationPage() {
   const [otp, setOtp]                   = useState("");
@@ -52,15 +52,7 @@ export default function OtpConfirmationPage() {
 
   const handleResend = async () => {
     setResendDisabled(true);
-    setStatus({ type: "info", msg: "جاري إعادة إرسال الكود..." });
-    try {
-      await axios.post("https://api.saniah.ly/resend-otp", {
-        phone: state.phone, sessionID: state.sessionID, countryCode: "LY",
-      });
-      setStatus({ type: "success", msg: "✔ تم إرسال كود جديد" });
-    } catch {
-      setStatus({ type: "error", msg: "❌ فشل في إعادة الإرسال" });
-    }
+    setStatus({ type: "warning", msg: "لإعادة إرسال الكود يرجى الرجوع وإعادة بدء عملية الدفع" });
   };
 
   const handleConfirm = async () => {
@@ -72,23 +64,24 @@ export default function OtpConfirmationPage() {
     setIsLoading(true);
     setStatus(null);
     try {
-      const verifyRes = await axios.get(`https://api.saniah.ly/verify/${state.sessionID}`);
-      if (!verifyRes.data.isValid) {
-        setStatus({ type: "error", msg: "❌ انتهت صلاحية الجلسة، يرجى البدء من جديد" });
-        return;
-      }
-      const confirmRes = await axios.post("https://api.saniah.ly/confirm", {
-        otp, sessionID: state.sessionID, phone: state.phone, countryCode: "LY",
+      const confirmRes = await callEdfaaly("onlineConfTrans", {
+        otp,
+        sessionID: state.sessionID,
+        customerMobile: state.phone,
+        paymentMethod: state.paymentMethod || "أدفع لي",
+        originalAmount: state.amount,
+        totalAmount: state.amount,
+        meterNumber: state.mosque,
       });
-      if (confirmRes.data.success) {
+      if (confirmRes.success) {
         await saveDonation();
         setStatus({ type: "success", msg: "✅ تمت العملية بنجاح" });
         setTimeout(() => navigate("/thank-you"), 1500);
       } else {
-        setStatus({ type: "error", msg: confirmRes.data.message || "❌ كود التأكيد غير صحيح" });
+        setStatus({ type: "error", msg: confirmRes.message || "❌ كود التأكيد غير صحيح" });
       }
-    } catch {
-      setStatus({ type: "error", msg: "❌ حدث خطأ أثناء التأكيد" });
+    } catch (err) {
+      setStatus({ type: "error", msg: err.message || "❌ حدث خطأ أثناء التأكيد" });
     } finally {
       setIsLoading(false);
     }

@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "../firebase";
-import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
+import { callEdfaaly } from "../lib/edfaalyApi";
 
 const METHOD_CONFIG = {
   edfaaly: {
@@ -59,20 +56,19 @@ export default function PaymentMethod() {
 
     const customer = config.toCustomer(normalized);
 
-    const response = await axios.post(
-      "https://api.saniah.ly/api/pay",
-      {
-        customer,
-        amount: state.amount,
-        mosque: state.mosque,
-        quantity: state.quantity,
-        paymentMethod: config.paymentMethod,
-      },
-      { headers: { "X-Request-ID": uuidv4() }, timeout: 20000 }
-    );
+    const response = await callEdfaaly("doPTrans", {
+      customerMobile: customer,
+      amount: state.amount,
+      originalAmount: state.amount,
+      totalAmount: state.amount,
+      paymentMethod: config.paymentMethod,
+      meterNumber: state.mosque,
+      cardNumber: method === "mobicash" ? normalized : "",
+      mobiCard: method === "mobicash" ? normalized : "",
+    });
 
-    if (!response.data.success) {
-      throw new Error(response.data.error || "تعذر بدء الدفع");
+    if (!response.success) {
+      throw new Error(response.message || "تعذر بدء الدفع");
     }
 
     navigate("/confirm", {
@@ -80,7 +76,7 @@ export default function PaymentMethod() {
         ...state,
         phone: customer,
         paymentNumber: normalized,
-        sessionID: response.data.sessionID,
+        sessionID: response.sessionID,
         paymentMethod: config.paymentMethod,
       },
     });
