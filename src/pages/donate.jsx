@@ -5,15 +5,6 @@ import { v4 as uuidv4 } from "uuid";
 
 const PRICE_PER_BOX = 6;
 
-const MOSQUES = [
-  "مسجد الرحمن",
-  "مسجد النور",
-  "مسجد الهدى",
-  "مسجد التوحيد",
-  "مسجد السلام",
-  "مسجد الفاروق",
-];
-
 function convertToEnglishDigits(input) {
   return input.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
 }
@@ -21,6 +12,8 @@ function convertToEnglishDigits(input) {
 export default function Donate() {
   const [phone, setPhone]       = useState("+218");
   const [mosque, setMosque]     = useState("");
+  const [mosqueAddress, setMosqueAddress] = useState("");
+  const [mosqueLocation, setMosqueLocation] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]       = useState("");
@@ -45,15 +38,37 @@ export default function Donate() {
         return;
       }
 
-      if (!mosque) {
-        setError("يرجى اختيار المسجد");
+      const mosqueName = mosque.trim();
+      const address = mosqueAddress.trim();
+      const location = mosqueLocation.trim();
+
+      if (!mosqueName) {
+        setError("يرجى كتابة اسم المسجد");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!address) {
+        setError("يرجى كتابة عنوان المسجد");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!location) {
+        setError("يرجى إضافة رابط موقع المسجد من خرائط Google");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!/^https?:\/\/.+/i.test(location)) {
+        setError("رابط الموقع يجب أن يبدأ بـ http أو https");
         setIsLoading(false);
         return;
       }
 
       const response = await axios.post(
         "https://api.saniah.ly/api/pay",
-        { customer: cleanedPhone, amount: total, mosque, quantity },
+        { customer: cleanedPhone, amount: total, mosque: mosqueName, quantity },
         { headers: { "X-Request-ID": uuidv4() }, timeout: 20000 }
       );
 
@@ -64,7 +79,9 @@ export default function Donate() {
             phone: cleanedPhone,
             amount: total,
             quantity,
-            mosque,
+            mosque: mosqueName,
+            mosqueAddress: address,
+            mosqueLocation: location,
           },
         });
       } else {
@@ -122,13 +139,37 @@ export default function Donate() {
 
           {/* Mosque */}
           <div className="form-group">
-            <label>المسجد المراد التوصيل إليه</label>
-            <select value={mosque} onChange={(e) => setMosque(e.target.value)}>
-              <option value="">اختر مسجداً</option>
-              {MOSQUES.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+            <label>اسم المسجد</label>
+            <input
+              type="text"
+              value={mosque}
+              onChange={(e) => setMosque(e.target.value)}
+              placeholder="اكتب اسم المسجد"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>عنوان المسجد</label>
+            <input
+              type="text"
+              value={mosqueAddress}
+              onChange={(e) => setMosqueAddress(e.target.value)}
+              placeholder="مثال: بنغازي، منطقة ..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label>موقع المسجد على خرائط Google</label>
+            <input
+              type="url"
+              value={mosqueLocation}
+              onChange={(e) => setMosqueLocation(e.target.value)}
+              placeholder="https://maps.google.com/..."
+              dir="ltr"
+            />
+            <p style={s.fieldHint}>
+              افتح Google Maps، اختر المسجد أو المكان، ثم انسخ رابط المشاركة هنا.
+            </p>
           </div>
 
           {/* Quantity */}
@@ -200,6 +241,12 @@ const s = {
     fontSize: "2.8rem", fontWeight: 900, color: "var(--cyan)",
   },
   priceCurrency: { fontSize: "1.1rem", color: "var(--text-muted)" },
+  fieldHint: {
+    color: "var(--text-muted)",
+    fontSize: "0.78rem",
+    lineHeight: 1.7,
+    marginTop: "0.45rem",
+  },
 
   note: {
     textAlign: "center", fontSize: "0.82rem",

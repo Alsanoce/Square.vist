@@ -37,6 +37,8 @@ export default function OtpConfirmationPage() {
       phone: state.phone,
       amount: state.quantity,
       mosque: state.mosque,
+      mosqueAddress: state.mosqueAddress || "",
+      mosqueLocation: state.mosqueLocation || "",
       sessionID: state.sessionID,
       country: "ليبيا",
       timestamp: new Date(),
