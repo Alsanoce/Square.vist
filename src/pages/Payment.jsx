@@ -29,6 +29,7 @@ export default function Payment() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const [selected, setSelected] = useState("edfaaly");
+  const [edfaalyPhone, setEdfaalyPhone] = useState(state?.whatsapp || "");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -53,11 +54,21 @@ export default function Payment() {
     });
   };
 
+  const normalizeLocalPhone = (value) => value.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g, "").slice(0, 9);
+
   const startEdfaalyPayment = async () => {
+    const localPhone = normalizeLocalPhone(edfaalyPhone);
+
+    if (!/^9\d{8}$/.test(localPhone)) {
+      throw new Error("رقم هاتف أدفع لي يجب أن يكون 9 أرقام ويبدأ بـ 9، بدون +218");
+    }
+
+    const paymentPhone = `+218${localPhone}`;
+
     const response = await axios.post(
       "https://api.saniah.ly/api/pay",
       {
-        customer: state.phone,
+        customer: paymentPhone,
         amount: state.amount,
         mosque: state.mosque,
         quantity: state.quantity,
@@ -72,6 +83,8 @@ export default function Payment() {
     navigate("/confirm", {
       state: {
         ...state,
+        phone: paymentPhone,
+        edfaalyPhone: localPhone,
         sessionID: response.data.sessionID,
         paymentMethod: "أدفع لي",
       },
@@ -150,6 +163,25 @@ export default function Payment() {
               </button>
             ))}
           </div>
+
+          {selected === "edfaaly" && (
+            <div style={s.edfaalyBox}>
+              <div className="form-group" style={{ marginBottom: "0.9rem" }}>
+                <label>رقم هاتف أدفع لي</label>
+                <input
+                  type="tel"
+                  value={edfaalyPhone}
+                  onChange={(e) => setEdfaalyPhone(normalizeLocalPhone(e.target.value))}
+                  placeholder="912345678"
+                  dir="ltr"
+                />
+              </div>
+              <div style={s.edfaalyTotal}>
+                <span>قيمة الدفع</span>
+                <strong>{state.amount} دينار</strong>
+              </div>
+            </div>
+          )}
 
           {message && (
             <div className={`alert ${message.type === "error" ? "alert-danger" : "alert-success"}`}>
@@ -250,6 +282,21 @@ const s = {
   methodButtonActive: {
     borderColor: "var(--cyan)",
     boxShadow: "0 0 0 3px rgba(0,212,255,0.1)",
+  },
+  edfaalyBox: {
+    background: "rgba(0,212,255,0.05)",
+    border: "1px solid rgba(0,212,255,0.14)",
+    borderRadius: 14,
+    marginTop: "1rem",
+    padding: "1rem",
+  },
+  edfaalyTotal: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    color: "var(--text-muted)",
+    fontSize: "0.9rem",
   },
   backBtn: {
     display: "block",
