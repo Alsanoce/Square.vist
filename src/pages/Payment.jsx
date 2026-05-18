@@ -12,7 +12,7 @@ const METHODS = [
   {
     id: "mobicash",
     title: "موبي كاش",
-    description: "أدخل رقم البطاقة ثم انتقل إلى OTP.",
+    description: "أدخل رقم البطاقة وسنتواصل معك لإتمام الدفع.",
     icon: "/payment-icons/mobicash.png",
     path: "/payment/mobicash",
   },

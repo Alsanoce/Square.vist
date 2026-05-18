@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { callEdfaaly } from "../lib/edfaalyApi";
 
 const METHOD_CONFIG = {
@@ -24,6 +26,7 @@ const METHOD_CONFIG = {
     validate: (value) => value.length >= 8,
     error: "رقم بطاقة موبي كاش يجب أن يكون 8 أرقام على الأقل",
     toCustomer: (value) => value,
+    manual: true,
   },
 };
 
@@ -55,6 +58,30 @@ export default function PaymentMethod() {
     }
 
     const customer = config.toCustomer(normalized);
+
+    if (config.manual) {
+      await addDoc(collection(db, "payment_requests"), {
+        donorName: state.donorName,
+        phone: state.phone,
+        whatsapp: state.whatsapp,
+        amount: state.amount,
+        quantity: state.quantity,
+        mosque: state.mosque,
+        mosqueAddress: state.mosqueAddress,
+        mosqueLocation: state.mosqueLocation,
+        paymentMethod: config.paymentMethod,
+        paymentNumber: normalized,
+        status: "بانتظار الدفع",
+        country: "ليبيا",
+        timestamp: new Date(),
+      });
+
+      setMessage({
+        type: "success",
+        text: "تم تسجيل طلب موبي كاش. سنتواصل معك على واتساب لإتمام الدفع.",
+      });
+      return;
+    }
 
     const response = await callEdfaaly("doPTrans", {
       customerMobile: customer,
@@ -131,7 +158,7 @@ export default function PaymentMethod() {
           </div>
 
           {message && (
-            <div className="alert alert-danger">
+            <div className={`alert ${message.type === "success" ? "alert-success" : "alert-danger"}`}>
               {message.text}
             </div>
           )}
@@ -142,7 +169,13 @@ export default function PaymentMethod() {
             disabled={isLoading}
             style={{ marginTop: "1rem" }}
           >
-            {isLoading ? <><span className="spinner" /> جاري التحويل إلى OTP...</> : "المتابعة إلى OTP"}
+            {isLoading ? (
+              <><span className="spinner" /> جاري المعالجة...</>
+            ) : config.manual ? (
+              "تسجيل طلب الدفع"
+            ) : (
+              "المتابعة إلى OTP"
+            )}
           </button>
 
           <button type="button" onClick={() => navigate("/payment", { state })} style={s.backBtn}>
