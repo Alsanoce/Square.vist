@@ -36,6 +36,7 @@ export default function OtpConfirmationPage() {
     await addDoc(collection(db, "donations"), {
       donorName: state.donorName || "",
       phone: state.phone,
+      paymentPhone: state.paymentPhone || "",
       amount: state.amount,
       quantity: state.quantity,
       mosque: state.mosque,
@@ -67,7 +68,7 @@ export default function OtpConfirmationPage() {
       const confirmRes = await callEdfaaly("onlineConfTrans", {
         otp,
         sessionID: state.sessionID,
-        customerMobile: state.phone,
+        customerMobile: state.paymentPhone || state.phone,
         paymentMethod: state.paymentMethod || "أدفع لي",
         originalAmount: state.amount,
         totalAmount: state.amount,
@@ -102,7 +103,7 @@ export default function OtpConfirmationPage() {
           {/* Info */}
           <div style={s.infoBox}>
             <p style={s.infoText}>تم إرسال كود التحقق إلى الرقم:</p>
-            <p style={s.phoneDisplay}>{state?.phone}</p>
+            <p style={s.phoneDisplay}>{state?.paymentPhone || state?.phone}</p>
           </div>
 
           {/* OTP Input */}
