@@ -14,7 +14,7 @@ const METHOD_CONFIG = {
     paymentMethod: "أدفع لي",
     validate: (value) => /^9\d{8}$/.test(value),
     error: "رقم هاتف أدفع لي يجب أن يكون 9 أرقام ويبدأ بـ 9، بدون +218",
-    toCustomer: (value) => value,
+    toCustomer: (value) => `+218${value}`,
   },
   mobicash: {
     title: "موبي كاش",
