@@ -5,6 +5,8 @@ import Navbar               from "./components/Navbar";
 import Home                 from "./pages/home";
 import Donate               from "./pages/donate";
 import Payment              from "./pages/Payment";
+import PaymentMethod        from "./pages/PaymentMethod";
+import BankTransfer         from "./pages/BankTransfer";
 import OtpConfirmationPage  from "./pages/OtpConfirmationPage";
 import { ThankYou, About }  from "./pages/ThankYouAndAbout";
 
@@ -16,6 +18,8 @@ function App() {
         <Route path="/"          element={<Home />}                />
         <Route path="/donate"    element={<Donate />}             />
         <Route path="/payment"   element={<Payment />}            />
+        <Route path="/payment/bank" element={<BankTransfer />}    />
+        <Route path="/payment/:method" element={<PaymentMethod />} />
         <Route path="/confirm"   element={<OtpConfirmationPage />} />
         <Route path="/thank-you" element={<ThankYou />}           />
         <Route path="/about"     element={<About />}              />

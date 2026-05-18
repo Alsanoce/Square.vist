@@ -1,121 +1,39 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "../firebase";
-import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
 
 const METHODS = [
   {
     id: "edfaaly",
     title: "أدفع لي",
-    description: "دفع إلكتروني مباشر مع رسالة تأكيد OTP.",
+    description: "أدخل رقم هاتف أدفع لي ثم انتقل إلى OTP.",
     icon: "/payment-icons/adfa3ly.png",
+    path: "/payment/edfaaly",
   },
   {
     id: "mobicash",
     title: "موبي كاش",
-    description: "نسجل طلبك ونتواصل معك على واتساب لإتمام الدفع.",
+    description: "أدخل رقم البطاقة ثم انتقل إلى OTP.",
     icon: "/payment-icons/mobicash.png",
+    path: "/payment/mobicash",
   },
   {
     id: "bank",
     title: "تحويل مصرفي",
     description: "نسجل طلبك ونتواصل معك ببيانات التحويل المصرفي.",
+    path: "/payment/bank",
   },
 ];
 
 export default function Payment() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const [selected, setSelected] = useState("edfaaly");
-  const [edfaalyPhone, setEdfaalyPhone] = useState(state?.whatsapp || "");
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState(null);
 
   useEffect(() => {
     if (!state?.phone || !state?.mosque) navigate("/donate");
   }, [navigate, state]);
 
-  const saveManualRequest = async (method) => {
-    await addDoc(collection(db, "payment_requests"), {
-      donorName: state.donorName,
-      phone: state.phone,
-      whatsapp: state.whatsapp,
-      amount: state.amount,
-      quantity: state.quantity,
-      mosque: state.mosque,
-      mosqueAddress: state.mosqueAddress,
-      mosqueLocation: state.mosqueLocation,
-      paymentMethod: method,
-      status: "بانتظار الدفع",
-      country: "ليبيا",
-      timestamp: new Date(),
-    });
-  };
-
-  const normalizeLocalPhone = (value) => value.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g, "").slice(0, 9);
-
-  const startEdfaalyPayment = async () => {
-    const localPhone = normalizeLocalPhone(edfaalyPhone);
-
-    if (!/^9\d{8}$/.test(localPhone)) {
-      throw new Error("رقم هاتف أدفع لي يجب أن يكون 9 أرقام ويبدأ بـ 9، بدون +218");
-    }
-
-    const paymentPhone = `+218${localPhone}`;
-
-    const response = await axios.post(
-      "https://api.saniah.ly/api/pay",
-      {
-        customer: paymentPhone,
-        amount: state.amount,
-        mosque: state.mosque,
-        quantity: state.quantity,
-      },
-      { headers: { "X-Request-ID": uuidv4() }, timeout: 20000 }
-    );
-
-    if (!response.data.success) {
-      throw new Error(response.data.error || "تعذر بدء الدفع");
-    }
-
-    navigate("/confirm", {
-      state: {
-        ...state,
-        phone: paymentPhone,
-        edfaalyPhone: localPhone,
-        sessionID: response.data.sessionID,
-        paymentMethod: "أدفع لي",
-      },
-    });
-  };
-
-  const handlePayment = async () => {
-    if (isLoading) return;
-    setIsLoading(true);
-    setMessage(null);
-
-    try {
-      if (selected === "edfaaly") {
-        await startEdfaalyPayment();
-        return;
-      }
-
-      const methodName = selected === "mobicash" ? "موبي كاش" : "تحويل مصرفي";
-      await saveManualRequest(methodName);
-      setMessage({
-        type: "success",
-        text: `تم تسجيل طلبك عبر ${methodName}. سنتواصل معك على واتساب لإتمام الدفع.`,
-      });
-    } catch (err) {
-      setMessage({
-        type: "error",
-        text: err.response?.data?.error || err.message || "تعذر إكمال العملية. حاول مرة أخرى.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const goToMethod = (method) => {
+    navigate(method.path, { state });
   };
 
   if (!state) return null;
@@ -145,11 +63,8 @@ export default function Payment() {
               <button
                 key={method.id}
                 type="button"
-                onClick={() => setSelected(method.id)}
-                style={{
-                  ...s.methodButton,
-                  ...(selected === method.id ? s.methodButtonActive : {}),
-                }}
+                onClick={() => goToMethod(method)}
+                style={s.methodButton}
               >
                 {method.icon ? (
                   <img src={method.icon} alt="" style={s.methodIcon} />
@@ -163,40 +78,6 @@ export default function Payment() {
               </button>
             ))}
           </div>
-
-          {selected === "edfaaly" && (
-            <div style={s.edfaalyBox}>
-              <div className="form-group" style={{ marginBottom: "0.9rem" }}>
-                <label>رقم هاتف أدفع لي</label>
-                <input
-                  type="tel"
-                  value={edfaalyPhone}
-                  onChange={(e) => setEdfaalyPhone(normalizeLocalPhone(e.target.value))}
-                  placeholder="912345678"
-                  dir="ltr"
-                />
-              </div>
-              <div style={s.edfaalyTotal}>
-                <span>قيمة الدفع</span>
-                <strong>{state.amount} دينار</strong>
-              </div>
-            </div>
-          )}
-
-          {message && (
-            <div className={`alert ${message.type === "error" ? "alert-danger" : "alert-success"}`}>
-              {message.text}
-            </div>
-          )}
-
-          <button
-            className="btn-primary"
-            onClick={handlePayment}
-            disabled={isLoading}
-            style={{ marginTop: "1rem" }}
-          >
-            {isLoading ? <><span className="spinner" /> جاري المعالجة...</> : "إكمال الدفع"}
-          </button>
 
           <button type="button" onClick={() => navigate("/donate")} style={s.backBtn}>
             العودة لتعديل البيانات
@@ -278,25 +159,6 @@ const s = {
   methodText: {
     display: "grid",
     gap: "0.3rem",
-  },
-  methodButtonActive: {
-    borderColor: "var(--cyan)",
-    boxShadow: "0 0 0 3px rgba(0,212,255,0.1)",
-  },
-  edfaalyBox: {
-    background: "rgba(0,212,255,0.05)",
-    border: "1px solid rgba(0,212,255,0.14)",
-    borderRadius: 14,
-    marginTop: "1rem",
-    padding: "1rem",
-  },
-  edfaalyTotal: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "1rem",
-    color: "var(--text-muted)",
-    fontSize: "0.9rem",
   },
   backBtn: {
     display: "block",

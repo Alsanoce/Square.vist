@@ -1,0 +1,25 @@
+{
+  "name": "سقيا الخير",
+  "short_name": "سقيا",
+  "description": "تطبيق سقيا الخير للتبرع بكراتين الماء للمساجد.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1628",
+  "theme_color": "#0a1628",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/payment-icons/adfa3ly.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/payment-icons/mobicash.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
