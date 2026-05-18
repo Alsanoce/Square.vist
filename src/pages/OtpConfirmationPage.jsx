@@ -52,6 +52,17 @@ export default function OtpConfirmationPage() {
     });
   };
 
+  const isBankConfirmationOk = (response) => {
+    const rawResponse = String(response?.rawResponse || "");
+    const resultCode = String(response?.resultCode || response?.code || "");
+
+    return (
+      response?.success ||
+      /<OnlineConfTransResult[^>]*>\s*OK\s*<\/OnlineConfTransResult>/i.test(rawResponse) ||
+      /^OK$/i.test(resultCode.trim())
+    );
+  };
+
   const handleResend = async () => {
     setResendDisabled(true);
     setStatus({ type: "warning", msg: "لإعادة إرسال الكود يرجى الرجوع وإعادة بدء عملية الدفع" });
@@ -77,8 +88,12 @@ export default function OtpConfirmationPage() {
         totalAmount: payableAmount,
         meterNumber: state.mosque,
       });
-      if (confirmRes.success) {
-        await saveDonation();
+      if (isBankConfirmationOk(confirmRes)) {
+        try {
+          await saveDonation();
+        } catch (saveErr) {
+          console.warn("Donation was paid, but Firestore logging failed:", saveErr);
+        }
         setStatus({ type: "success", msg: "✅ تمت العملية بنجاح" });
         setTimeout(() => navigate("/thank-you"), 1500);
       } else {
