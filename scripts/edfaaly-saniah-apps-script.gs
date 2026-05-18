@@ -81,20 +81,22 @@ function handleDoPTrans(e) {
     return failAndLog("doPTrans", meta, "missing or invalid amount", { customerMobile, amount });
   }
 
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- xmlns:xsd="http://www.w3.org/2001/XMLSchema"
- xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
- <soap:Body>
-  <DoPTrans xmlns="http://tempuri.org/">
-   <Mobile>${escapeXml(CONFIG.MERCHANT_MOBILE)}</Mobile>
-   <Pin>${escapeXml(CONFIG.MERCHANT_PIN)}</Pin>
-   <Cmobile>${escapeXml(customerMobile)}</Cmobile>
-   <decimalAmount>${escapeXml(amount)}</decimalAmount>
-   <PW>${escapeXml(CONFIG.SERVICE_PASSWORD)}</PW>
-  </DoPTrans>
- </soap:Body>
-</soap:Envelope>`;
+  const xml = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ',
+    'xmlns:xsd="http://www.w3.org/2001/XMLSchema" ',
+    'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">',
+    '<soap:Body>',
+    '<DoPTrans xmlns="http://tempuri.org/">',
+    '<Mobile>' + escapeXml(CONFIG.MERCHANT_MOBILE) + '</Mobile>',
+    '<Pin>' + escapeXml(CONFIG.MERCHANT_PIN) + '</Pin>',
+    '<Cmobile>' + escapeXml(customerMobile) + '</Cmobile>',
+    '<decimalAmount>' + escapeXml(amount) + '</decimalAmount>',
+    '<PW>' + escapeXml(CONFIG.SERVICE_PASSWORD) + '</PW>',
+    '</DoPTrans>',
+    '</soap:Body>',
+    '</soap:Envelope>',
+  ].join("");
 
   const bank = callBank("DoPTrans", xml);
   const sessionID = extractTag(bank.raw, "DoPTransResult");
@@ -203,19 +205,21 @@ function handleOnlineConfTrans(e) {
     });
   }
 
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- xmlns:xsd="http://www.w3.org/2001/XMLSchema"
- xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
- <soap:Body>
-  <OnlineConfTrans xmlns="http://tempuri.org/">
-   <Mobile>${escapeXml(CONFIG.MERCHANT_MOBILE)}</Mobile>
-   <Pin>${escapeXml(otp)}</Pin>
-   <sessionID>${escapeXml(sessionID)}</sessionID>
-   <PW>${escapeXml(CONFIG.SERVICE_PASSWORD)}</PW>
-  </OnlineConfTrans>
- </soap:Body>
-</soap:Envelope>`;
+  const xml = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ',
+    'xmlns:xsd="http://www.w3.org/2001/XMLSchema" ',
+    'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">',
+    '<soap:Body>',
+    '<OnlineConfTrans xmlns="http://tempuri.org/">',
+    '<Mobile>' + escapeXml(CONFIG.MERCHANT_MOBILE) + '</Mobile>',
+    '<Pin>' + escapeXml(otp) + '</Pin>',
+    '<sessionID>' + escapeXml(sessionID) + '</sessionID>',
+    '<PW>' + escapeXml(CONFIG.SERVICE_PASSWORD) + '</PW>',
+    '</OnlineConfTrans>',
+    '</soap:Body>',
+    '</soap:Envelope>',
+  ].join("");
 
   const bank = callBank("OnlineConfTrans", xml);
   const result = extractTag(bank.raw, "OnlineConfTransResult");
