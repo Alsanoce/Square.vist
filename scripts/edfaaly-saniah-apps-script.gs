@@ -28,7 +28,8 @@ const CONFIG = {
   MERCHANT_PIN: "0000",
   SERVICE_PASSWORD: "123@xdsr$#!!",
 
-  // Telegram notifications are disabled until both values are filled.
+  // Telegram notifications are read from Script Properties first:
+  // TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
   TELEGRAM_BOT_TOKEN: "",
   TELEGRAM_CHAT_ID: "",
 };
@@ -387,7 +388,9 @@ function failAndLog(action, meta, message, values) {
 }
 
 function notifyTelegramPaymentSuccess(entry) {
-  if (!CONFIG.TELEGRAM_BOT_TOKEN || !CONFIG.TELEGRAM_CHAT_ID) return;
+  const telegram = getTelegramConfig();
+
+  if (!telegram.botToken || !telegram.chatId) return;
 
   try {
     const meta = entry.meta || {};
@@ -412,12 +415,12 @@ function notifyTelegramPaymentSuccess(entry) {
       `وقت العملية: ${new Date().toLocaleString("en-GB", { timeZone: "Africa/Tripoli" })}`,
     ];
 
-    UrlFetchApp.fetch(`https://api.telegram.org/bot${CONFIG.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
       method: "post",
       contentType: "application/json",
       muteHttpExceptions: true,
       payload: JSON.stringify({
-        chat_id: CONFIG.TELEGRAM_CHAT_ID,
+        chat_id: telegram.chatId,
         text: lines.join("\n"),
         disable_web_page_preview: false,
       }),
@@ -425,6 +428,15 @@ function notifyTelegramPaymentSuccess(entry) {
   } catch (err) {
     Logger.log(`telegram notify error: ${err.message}`);
   }
+}
+
+function getTelegramConfig() {
+  const props = PropertiesService.getScriptProperties();
+
+  return {
+    botToken: props.getProperty("TELEGRAM_BOT_TOKEN") || CONFIG.TELEGRAM_BOT_TOKEN,
+    chatId: props.getProperty("TELEGRAM_CHAT_ID") || CONFIG.TELEGRAM_CHAT_ID,
+  };
 }
 
 function getMeta(e) {
