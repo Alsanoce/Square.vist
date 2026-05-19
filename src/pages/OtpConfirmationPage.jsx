@@ -82,6 +82,7 @@ export default function OtpConfirmationPage() {
         quantity: state.quantity || "",
         transactionId: state.transactionId || "",
         donorName: state.donorName || "",
+        donorPhone: state.phone || "",
         mosque: state.mosque || "",
         mosqueAddress: state.mosqueAddress || "",
         mosqueLocation: state.mosqueLocation || "",

@@ -27,6 +27,10 @@ const CONFIG = {
   MERCHANT_MOBILE: "9XXXXXXXX",
   MERCHANT_PIN: "0000",
   SERVICE_PASSWORD: "123@xdsr$#!!",
+
+  // Telegram notifications are disabled until both values are filled.
+  TELEGRAM_BOT_TOKEN: "",
+  TELEGRAM_CHAT_ID: "",
 };
 
 const ERROR_MESSAGES = {
@@ -238,6 +242,16 @@ function handleOnlineConfTrans(e) {
     meta,
   });
 
+  if (ok) {
+    notifyTelegramPaymentSuccess({
+      customerMobile,
+      amount,
+      sessionID,
+      resultCode: result,
+      meta,
+    });
+  }
+
   if (bank.statusCode !== 200) {
     return {
       success: false,
@@ -298,6 +312,7 @@ function getSheet() {
       "transactionId",
       "action",
       "donorName",
+      "donorPhone",
       "paymentMethod",
       "customerMobile",
       "amount",
@@ -329,6 +344,7 @@ function logTransaction(entry) {
       meta.transactionId || "",
       entry.action || "",
       meta.donorName || "",
+      meta.donorPhone || "",
       meta.paymentMethod || "",
       entry.customerMobile || "",
       entry.amount || "",
@@ -370,9 +386,51 @@ function failAndLog(action, meta, message, values) {
   return { success: false, message };
 }
 
+function notifyTelegramPaymentSuccess(entry) {
+  if (!CONFIG.TELEGRAM_BOT_TOKEN || !CONFIG.TELEGRAM_CHAT_ID) return;
+
+  try {
+    const meta = entry.meta || {};
+    const lines = [
+      "✅ عملية دفع ناجحة",
+      "",
+      `رقم العملية: ${meta.transactionId || "-"}`,
+      `المتبرع: ${meta.donorName || "-"}`,
+      `رقم هاتف المتبرع: ${meta.donorPhone || "-"}`,
+      `رقم أدفع لي: ${entry.customerMobile || "-"}`,
+      `طريقة الدفع: ${meta.paymentMethod || "أدفع لي"}`,
+      `المبلغ: ${entry.amount || "-"} دينار`,
+      `عدد الكراتين: ${meta.quantity || "-"}`,
+      `سعر الكرتونة: ${meta.unitPrice || "-"}`,
+      "",
+      `المسجد: ${meta.mosque || meta.meterNumber || "-"}`,
+      `عنوان المسجد: ${meta.mosqueAddress || "-"}`,
+      `موقع المسجد: ${meta.mosqueLocation || "-"}`,
+      "",
+      `جلسة الدفع: ${entry.sessionID || "-"}`,
+      `نتيجة المصرف: ${entry.resultCode || "OK"}`,
+      `وقت العملية: ${new Date().toLocaleString("en-GB", { timeZone: "Africa/Tripoli" })}`,
+    ];
+
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${CONFIG.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "post",
+      contentType: "application/json",
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        chat_id: CONFIG.TELEGRAM_CHAT_ID,
+        text: lines.join("\n"),
+        disable_web_page_preview: false,
+      }),
+    });
+  } catch (err) {
+    Logger.log(`telegram notify error: ${err.message}`);
+  }
+}
+
 function getMeta(e) {
   return {
     donorName: getParam(e, "donorName"),
+    donorPhone: getParam(e, "donorPhone"),
     transactionId: getParam(e, "transactionId"),
     paymentMethod: getParam(e, "paymentMethod"),
     quantity: getParam(e, "quantity"),

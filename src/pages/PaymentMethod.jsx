@@ -42,7 +42,7 @@ export default function PaymentMethod() {
   const config = METHOD_CONFIG[method];
   const { state } = useLocation();
   const navigate = useNavigate();
-  const [paymentNumber, setPaymentNumber] = useState(method === "edfaaly" ? state?.whatsapp || "" : "");
+  const [paymentNumber, setPaymentNumber] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const payableAmount = Number(state?.amount || 0);
@@ -96,6 +96,7 @@ export default function PaymentMethod() {
       quantity: state.quantity,
       transactionId: state.transactionId || "",
       donorName: state.donorName || "",
+      donorPhone: state.phone || "",
       paymentMethod: config.paymentMethod,
       meterNumber: state.mosque,
       mosque: state.mosque,
