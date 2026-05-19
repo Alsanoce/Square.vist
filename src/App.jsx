@@ -8,7 +8,8 @@ import Payment              from "./pages/Payment";
 import PaymentMethod        from "./pages/PaymentMethod";
 import BankTransfer         from "./pages/BankTransfer";
 import OtpConfirmationPage  from "./pages/OtpConfirmationPage";
-import { ThankYou, About }  from "./pages/ThankYouAndAbout";
+import ThankYouReceipt      from "./pages/ThankYouReceipt";
+import { About }            from "./pages/ThankYouAndAbout";
 
 function App() {
   return (
@@ -21,7 +22,7 @@ function App() {
         <Route path="/payment/bank" element={<BankTransfer />}    />
         <Route path="/payment/:method" element={<PaymentMethod />} />
         <Route path="/confirm"   element={<OtpConfirmationPage />} />
-        <Route path="/thank-you" element={<ThankYou />}           />
+        <Route path="/thank-you" element={<ThankYouReceipt />}    />
         <Route path="/about"     element={<About />}              />
       </Routes>
     </>

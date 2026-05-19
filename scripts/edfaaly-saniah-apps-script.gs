@@ -295,6 +295,7 @@ function getSheet() {
     sheet = ss.insertSheet(CONFIG.SHEET_NAME);
     sheet.appendRow([
       "date",
+      "transactionId",
       "action",
       "donorName",
       "paymentMethod",
@@ -317,10 +318,15 @@ function getSheet() {
 }
 
 function logTransaction(entry) {
+  const lock = LockService.getScriptLock();
+
   try {
+    lock.waitLock(10000);
+
     const meta = entry.meta || {};
     getSheet().appendRow([
       new Date(),
+      meta.transactionId || "",
       entry.action || "",
       meta.donorName || "",
       meta.paymentMethod || "",
@@ -339,6 +345,12 @@ function logTransaction(entry) {
     ]);
   } catch (err) {
     Logger.log(`logTransaction error: ${err.message}`);
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (err) {
+      Logger.log(`lock release error: ${err.message}`);
+    }
   }
 }
 
@@ -361,6 +373,7 @@ function failAndLog(action, meta, message, values) {
 function getMeta(e) {
   return {
     donorName: getParam(e, "donorName"),
+    transactionId: getParam(e, "transactionId"),
     paymentMethod: getParam(e, "paymentMethod"),
     quantity: getParam(e, "quantity"),
     unitPrice: getParam(e, "unitPrice"),

@@ -78,12 +78,19 @@ export default function OtpConfirmationPage() {
         decimalAmount: payableAmount,
         originalAmount: payableAmount,
         totalAmount: payableAmount,
+        unitPrice: state.unitPrice || "",
+        quantity: state.quantity || "",
+        transactionId: state.transactionId || "",
+        donorName: state.donorName || "",
+        mosque: state.mosque || "",
+        mosqueAddress: state.mosqueAddress || "",
+        mosqueLocation: state.mosqueLocation || "",
         meterNumber: state.mosque,
       });
 
       if (isBankConfirmationOk(confirmRes)) {
         setStatus({ type: "success", msg: "تمت العملية بنجاح" });
-        setTimeout(() => navigate("/thank-you"), 1500);
+        setTimeout(() => navigate("/thank-you", { state: { ...state, amount: payableAmount } }), 1500);
       } else {
         setStatus({
           type: "error",

@@ -4,8 +4,6 @@ import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { callEdfaaly } from "../lib/edfaalyApi";
 
-const PRICE_PER_BOX = 6;
-
 const METHOD_CONFIG = {
   edfaaly: {
     title: "أدفع لي",
@@ -47,7 +45,7 @@ export default function PaymentMethod() {
   const [paymentNumber, setPaymentNumber] = useState(method === "edfaaly" ? state?.whatsapp || "" : "");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const payableAmount = Number(state?.quantity || 1) * PRICE_PER_BOX;
+  const payableAmount = Number(state?.amount || 0);
 
   useEffect(() => {
     if (!config || !state?.phone || !state?.mosque) navigate("/donate");
@@ -69,6 +67,8 @@ export default function PaymentMethod() {
         whatsapp: state.whatsapp,
         amount: state.amount,
         quantity: state.quantity,
+        unitPrice: state.unitPrice,
+        transactionId: state.transactionId,
         mosque: state.mosque,
         mosqueAddress: state.mosqueAddress,
         mosqueLocation: state.mosqueLocation,
@@ -92,10 +92,15 @@ export default function PaymentMethod() {
       decimalAmount: payableAmount,
       originalAmount: payableAmount,
       totalAmount: payableAmount,
-      unitPrice: PRICE_PER_BOX,
+      unitPrice: state.unitPrice || "",
       quantity: state.quantity,
+      transactionId: state.transactionId || "",
+      donorName: state.donorName || "",
       paymentMethod: config.paymentMethod,
       meterNumber: state.mosque,
+      mosque: state.mosque,
+      mosqueAddress: state.mosqueAddress || "",
+      mosqueLocation: state.mosqueLocation || "",
       cardNumber: method === "mobicash" ? normalized : "",
       mobiCard: method === "mobicash" ? normalized : "",
     });

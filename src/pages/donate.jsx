@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const PRICE_PER_BOX = 6;
+import { DONATION_PACKAGES, createTransactionId, getDonationPackage } from "../lib/donationPricing";
 
 function convertToEnglishDigits(input) {
   return input.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
@@ -9,20 +8,18 @@ function convertToEnglishDigits(input) {
 
 export default function Donate() {
   const [donorName, setDonorName] = useState("");
-  const [phone, setPhone]       = useState("");
-  const [mosque, setMosque]     = useState("");
+  const [phone, setPhone] = useState("");
+  const [mosque, setMosque] = useState("");
   const [mosqueAddress, setMosqueAddress] = useState("");
   const [mosqueLocation, setMosqueLocation] = useState("");
   const [isLocating, setIsLocating] = useState(false);
-  const [quantity, setQuantity] = useState(1);
-  const [error, setError]       = useState("");
+  const [quantity, setQuantity] = useState(DONATION_PACKAGES[0].quantity);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const total = PRICE_PER_BOX * quantity;
-
-  const changeQty = (delta) => {
-    setQuantity((q) => Math.max(1, Math.min(100, q + delta)));
-  };
+  const selectedPackage = getDonationPackage(quantity);
+  const total = selectedPackage.total;
+  const unitPrice = total / selectedPackage.quantity;
 
   const getMapsSearchUrl = () => {
     const query = [mosque.trim(), mosqueAddress.trim(), "بنغازي", "ليبيا"]
@@ -95,11 +92,13 @@ export default function Donate() {
 
     navigate("/payment", {
       state: {
+        transactionId: createTransactionId(),
         donorName: name,
         phone: `+218${cleanedPhone}`,
         whatsapp: cleanedPhone,
         amount: total,
-        quantity,
+        quantity: selectedPackage.quantity,
+        unitPrice,
         mosque: mosqueName,
         mosqueAddress: address,
         mosqueLocation: location,
@@ -110,31 +109,24 @@ export default function Donate() {
   return (
     <div className="page-wrapper">
       <div className="section" style={s.wrapper}>
-
-        {/* Header */}
         <div style={s.header}>
           <span className="section-tag">تبرع الآن</span>
           <h1 className="section-title">
-            تبرع بـ <span>كرتونة ماء</span>
+            تبرع بـ <span>كراتين ماء</span>
           </h1>
-          <p style={s.subtitle}>
-            ادفع قيمة الكرتونة وسنوصلها للمساجد في بنغازي
-          </p>
+          <p style={s.subtitle}>اختر عدد الكراتين وسنقوم بتوصيلها للمسجد المحدد في بنغازي.</p>
         </div>
 
-        {/* Card */}
         <div className="card" style={s.card}>
-
-          {/* Price badge */}
           <div style={s.priceBadge}>
-            <div style={s.priceLabel}>سعر الكرتونة الواحدة</div>
+            <div style={s.priceLabel}>أقل تبرع</div>
             <div style={s.priceValue}>
               <span style={s.priceCurrency}>دينار </span>
-              {PRICE_PER_BOX}
+              100
             </div>
+            <p style={s.packageHint}>10 كراتين ماء، وكلما زاد العدد صار سعر الكرتونة أقل.</p>
           </div>
 
-          {/* Donor */}
           <div className="form-group">
             <label>اسم المتبرع</label>
             <input
@@ -145,7 +137,6 @@ export default function Donate() {
             />
           </div>
 
-          {/* Phone */}
           <div className="form-group">
             <label>رقم الواتساب</label>
             <input
@@ -158,7 +149,6 @@ export default function Donate() {
             <p style={s.fieldHint}>اكتب الرقم بدون +218.</p>
           </div>
 
-          {/* Mosque */}
           <div className="form-group">
             <label>اسم المسجد</label>
             <input
@@ -182,74 +172,66 @@ export default function Donate() {
           <div className="form-group">
             <label>موقع المسجد على خرائط Google</label>
             <div style={s.locationActions}>
-              <button
-                type="button"
-                onClick={useCurrentLocation}
-                disabled={isLocating}
-                style={s.locationButton}
-              >
+              <button type="button" onClick={useCurrentLocation} disabled={isLocating} style={s.locationButton}>
                 {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
               </button>
-              <button
-                type="button"
-                onClick={openGoogleMaps}
-                style={s.mapButton}
-              >
+              <button type="button" onClick={openGoogleMaps} style={s.mapButton}>
                 افتح خرائط Google
               </button>
             </div>
             {mosqueLocation && (
-              <a
-                href={mosqueLocation}
-                target="_blank"
-                rel="noreferrer"
-                style={s.locationLink}
-              >
+              <a href={mosqueLocation} target="_blank" rel="noreferrer" style={s.locationLink}>
                 تم تحديد الموقع - عرض على الخريطة
               </a>
             )}
-            <p style={s.fieldHint}>
-              عند الضغط على استخدام موقعي الحالي سيطلب المتصفح السماح بتحديد الموقع.
-            </p>
+            <p style={s.fieldHint}>عند الضغط على استخدام موقعي الحالي سيطلب المتصفح السماح بتحديد الموقع.</p>
           </div>
 
-          {/* Quantity */}
           <div className="form-group">
-            <label>عدد الكراتين</label>
-            <div className="qty-control">
-              <button className="qty-btn" onClick={() => changeQty(-1)}>−</button>
-              <div className="qty-display">{quantity}</div>
-              <button className="qty-btn" onClick={() => changeQty(1)}>+</button>
+            <label>عدد كراتين الماء</label>
+            <div style={s.packageGrid}>
+              {DONATION_PACKAGES.map((item) => {
+                const isSelected = item.quantity === selectedPackage.quantity;
+
+                return (
+                  <button
+                    key={item.quantity}
+                    type="button"
+                    onClick={() => setQuantity(item.quantity)}
+                    style={{
+                      ...s.packageButton,
+                      ...(isSelected ? s.packageButtonActive : {}),
+                    }}
+                  >
+                    <strong>{item.quantity}</strong>
+                    <span>كرتونة</span>
+                    <small>{item.total} دينار</small>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Total */}
           <div className="total-box">
-            المبلغ الإجمالي:{" "}
+            <span>المبلغ الإجمالي: </span>
             <strong>{total} دينار</strong>
+            <small style={s.totalHint}>سعر الكرتونة: {unitPrice.toFixed(2)} دينار</small>
           </div>
 
-          {/* Error */}
           {error && <div className="alert alert-danger">{error}</div>}
 
-          {/* Submit */}
-          <button
-            className="btn-primary"
-            onClick={handleSubmit}
-            style={{ marginTop: "0.5rem" }}
-          >
+          <button className="btn-primary" onClick={handleSubmit} style={{ marginTop: "0.5rem" }}>
             المتابعة إلى الدفع
           </button>
 
-          <p style={s.note}>
-            في الخطوة التالية اختر طريقة الدفع المناسبة لك.
-          </p>
+          <p style={s.note}>في الخطوة التالية اختر طريقة الدفع المناسبة لك.</p>
         </div>
 
-        {/* Trust indicators */}
         <div style={s.trust}>
-          {["🔒 دفع آمن", "🕌 توصيل مضمون", "📸 توثيق كامل"].map((t) => (
-            <span key={t} style={s.trustItem}>{t}</span>
+          {["دفع آمن", "توصيل مضمون", "توثيق كامل"].map((t) => (
+            <span key={t} style={s.trustItem}>
+              {t}
+            </span>
           ))}
         </div>
       </div>
@@ -259,7 +241,7 @@ export default function Donate() {
 
 const s = {
   wrapper: { maxWidth: 560, margin: "0 auto" },
-  header:  { textAlign: "center", marginBottom: "2.5rem" },
+  header: { textAlign: "center", marginBottom: "2.5rem" },
   subtitle: { color: "var(--text-muted)", fontSize: "0.97rem", marginTop: "0.5rem" },
   card: { padding: "2.2rem" },
 
@@ -274,9 +256,16 @@ const s = {
   priceLabel: { fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.3rem" },
   priceValue: {
     fontFamily: "'Cairo', sans-serif",
-    fontSize: "2.8rem", fontWeight: 900, color: "var(--cyan)",
+    fontSize: "2.8rem",
+    fontWeight: 900,
+    color: "var(--cyan)",
   },
   priceCurrency: { fontSize: "1.1rem", color: "var(--text-muted)" },
+  packageHint: {
+    color: "var(--text-muted)",
+    fontSize: "0.84rem",
+    marginTop: "0.45rem",
+  },
   fieldHint: {
     color: "var(--text-muted)",
     fontSize: "0.78rem",
@@ -320,20 +309,54 @@ const s = {
     marginTop: "0.65rem",
     textDecoration: "none",
   },
-
-  note: {
-    textAlign: "center", fontSize: "0.82rem",
-    color: "var(--text-muted)", marginTop: "1rem",
+  packageGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "0.75rem",
   },
-
+  packageButton: {
+    minHeight: 104,
+    display: "grid",
+    alignContent: "center",
+    gap: "0.2rem",
+    border: "1px solid rgba(0,212,255,0.18)",
+    borderRadius: 12,
+    background: "rgba(255,255,255,0.04)",
+    color: "var(--white)",
+    fontFamily: "'Tajawal', sans-serif",
+    cursor: "pointer",
+    padding: "0.8rem 0.5rem",
+  },
+  packageButtonActive: {
+    borderColor: "rgba(0,212,255,0.75)",
+    background: "rgba(0,212,255,0.12)",
+    boxShadow: "0 0 0 2px rgba(0,212,255,0.1)",
+  },
+  totalHint: {
+    display: "block",
+    color: "var(--text-muted)",
+    fontSize: "0.78rem",
+    marginTop: "0.35rem",
+  },
+  note: {
+    textAlign: "center",
+    fontSize: "0.82rem",
+    color: "var(--text-muted)",
+    marginTop: "1rem",
+  },
   trust: {
-    display: "flex", justifyContent: "center",
-    gap: "1.5rem", flexWrap: "wrap", marginTop: "1.8rem",
+    display: "flex",
+    justifyContent: "center",
+    gap: "1.5rem",
+    flexWrap: "wrap",
+    marginTop: "1.8rem",
   },
   trustItem: {
-    fontSize: "0.82rem", color: "var(--text-muted)",
+    fontSize: "0.82rem",
+    color: "var(--text-muted)",
     background: "rgba(255,255,255,0.03)",
     border: "1px solid rgba(0,212,255,0.1)",
-    padding: "0.4rem 1rem", borderRadius: "50px",
+    padding: "0.4rem 1rem",
+    borderRadius: "50px",
   },
 };
