@@ -58,6 +58,8 @@ function doGet(e) {
       result = handleOnlineConfTrans(e);
     } else if (action === "testTelegram") {
       result = handleTestTelegram();
+    } else if (action === "telegramStatus") {
+      result = handleTelegramStatus();
     } else if (action === "health") {
       result = { success: true, message: "Saniah payment API is running" };
     } else {
@@ -245,8 +247,10 @@ function handleOnlineConfTrans(e) {
     meta,
   });
 
+  let telegramNotify = { success: false, message: "not attempted" };
+
   if (ok) {
-    notifyTelegramPaymentSuccess({
+    telegramNotify = notifyTelegramPaymentSuccess({
       customerMobile,
       amount,
       sessionID,
@@ -259,12 +263,17 @@ function handleOnlineConfTrans(e) {
     return {
       success: false,
       message: `HTTP Error ${bank.statusCode}`,
+      telegramNotify,
       rawResponse: bank.raw,
     };
   }
 
   if (fault) {
-    return { success: false, message: fault, rawResponse: bank.raw };
+    return { success: false, message: fault, telegramNotify, rawResponse: bank.raw };
+  }
+
+  if (ok) {
+    return { success: true, message: "تم الدفع بنجاح", telegramNotify, rawResponse: bank.raw };
   }
 
   return ok
@@ -400,6 +409,17 @@ function handleTestTelegram() {
   return sent;
 }
 
+function handleTelegramStatus() {
+  const telegram = getTelegramConfig();
+
+  return {
+    success: Boolean(telegram.botToken && telegram.chatId),
+    hasBotToken: Boolean(telegram.botToken),
+    hasChatId: Boolean(telegram.chatId),
+    chatId: telegram.chatId || "",
+  };
+}
+
 function notifyTelegramPaymentSuccess(entry) {
   try {
     const meta = entry.meta || {};
@@ -429,8 +449,14 @@ function notifyTelegramPaymentSuccess(entry) {
     if (!sent.success) {
       Logger.log(`telegram notify failed: ${sent.message}`);
     }
+
+    return sent;
   } catch (err) {
     Logger.log(`telegram notify error: ${err.message}`);
+    return {
+      success: false,
+      message: err.message || String(err),
+    };
   }
 }
 
