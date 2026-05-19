@@ -56,6 +56,8 @@ function doGet(e) {
       result = handleDoPTrans(e);
     } else if (action === "onlineConfTrans") {
       result = handleOnlineConfTrans(e);
+    } else if (action === "testTelegram") {
+      result = handleTestTelegram();
     } else if (action === "health") {
       result = { success: true, message: "Saniah payment API is running" };
     } else {
@@ -387,11 +389,18 @@ function failAndLog(action, meta, message, values) {
   return { success: false, message };
 }
 
+function handleTestTelegram() {
+  const sent = sendTelegramMessage([
+    "✅ اختبار إشعار سقيا",
+    "",
+    "إذا وصلتك هذه الرسالة فإعدادات تليجرام تعمل بشكل صحيح.",
+    `وقت الاختبار: ${new Date().toLocaleString("en-GB", { timeZone: "Africa/Tripoli" })}`,
+  ].join("\n"));
+
+  return sent;
+}
+
 function notifyTelegramPaymentSuccess(entry) {
-  const telegram = getTelegramConfig();
-
-  if (!telegram.botToken || !telegram.chatId) return;
-
   try {
     const meta = entry.meta || {};
     const lines = [
@@ -415,18 +424,59 @@ function notifyTelegramPaymentSuccess(entry) {
       `وقت العملية: ${new Date().toLocaleString("en-GB", { timeZone: "Africa/Tripoli" })}`,
     ];
 
-    UrlFetchApp.fetch(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
+    const sent = sendTelegramMessage(lines.join("\n"));
+
+    if (!sent.success) {
+      Logger.log(`telegram notify failed: ${sent.message}`);
+    }
+  } catch (err) {
+    Logger.log(`telegram notify error: ${err.message}`);
+  }
+}
+
+function sendTelegramMessage(text) {
+  const telegram = getTelegramConfig();
+
+  if (!telegram.botToken || !telegram.chatId) {
+    return {
+      success: false,
+      message: "missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in Script Properties",
+    };
+  }
+
+  try {
+    const response = UrlFetchApp.fetch(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
       method: "post",
       contentType: "application/json",
       muteHttpExceptions: true,
       payload: JSON.stringify({
         chat_id: telegram.chatId,
-        text: lines.join("\n"),
+        text,
         disable_web_page_preview: false,
       }),
     });
+
+    const statusCode = response.getResponseCode();
+    const raw = response.getContentText();
+    let body = {};
+
+    try {
+      body = JSON.parse(raw);
+    } catch (err) {
+      body = { raw };
+    }
+
+    return {
+      success: statusCode === 200 && body.ok === true,
+      statusCode,
+      message: body.description || (body.ok ? "sent" : "telegram request failed"),
+      telegramResponse: body,
+    };
   } catch (err) {
-    Logger.log(`telegram notify error: ${err.message}`);
+    return {
+      success: false,
+      message: err.message || String(err),
+    };
   }
 }
 
