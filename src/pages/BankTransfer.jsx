@@ -10,12 +10,27 @@ const BANK_DETAILS = {
   accountHolder: "السنوسي سعد جمعة",
 };
 
+function withTimeout(promise, message, timeoutMs = 30000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
+}
+
+function formatFirebaseError(err) {
+  const code = err?.code ? ` (${err.code})` : "";
+  return `${err?.message || "حدث خطأ غير معروف"}${code}`;
+}
+
 export default function BankTransfer() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const [message, setMessage] = useState(null);
   const [receiptFile, setReceiptFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
 
   const receiptPreview = useMemo(() => {
     if (!receiptFile) return "";
@@ -61,11 +76,15 @@ export default function BankTransfer() {
     const extension = receiptFile.name.split(".").pop() || "jpg";
     const receiptRef = ref(storage, `bank-receipts/${safeTransactionId}.${extension}`);
 
-    await uploadBytes(receiptRef, receiptFile, {
-      contentType: receiptFile.type,
-    });
+    await withTimeout(
+      uploadBytes(receiptRef, receiptFile, { contentType: receiptFile.type }),
+      "انتهت مهلة رفع صورة الإيصال. تأكد من تفعيل Firebase Storage وصلاحياته."
+    );
 
-    return getDownloadURL(receiptRef);
+    return withTimeout(
+      getDownloadURL(receiptRef),
+      "تم رفع الصورة لكن تعذر جلب رابط الإيصال من Firebase Storage."
+    );
   };
 
   const saveRequest = async () => {
@@ -77,44 +96,52 @@ export default function BankTransfer() {
     }
 
     setIsLoading(true);
+    setLoadingText("جاري رفع صورة الإيصال...");
     setMessage(null);
 
     try {
       const receiptUrl = await uploadReceipt();
 
-      await addDoc(collection(db, "payment_requests"), {
-        transactionId: state.transactionId || "",
-        donorName: state.donorName,
-        phone: state.phone,
-        whatsapp: state.whatsapp,
-        amount: state.amount,
-        quantity: state.quantity,
-        unitPrice: state.unitPrice,
-        mosque: state.mosque,
-        mosqueAddress: state.mosqueAddress,
-        mosqueLocation: state.mosqueLocation,
-        paymentMethod: "تحويل مصرفي",
-        bankName: BANK_DETAILS.bankName,
-        bankAccountNumber: BANK_DETAILS.accountNumber,
-        bankAccountHolder: BANK_DETAILS.accountHolder,
-        receiptUrl,
-        receiptFileName: receiptFile.name,
-        status: "بانتظار مراجعة الإيصال",
-        country: "ليبيا",
-        timestamp: new Date(),
-      });
+      setLoadingText("جاري تسجيل بيانات التحويل...");
+
+      await withTimeout(
+        addDoc(collection(db, "payment_requests"), {
+          transactionId: state.transactionId || "",
+          donorName: state.donorName,
+          phone: state.phone,
+          whatsapp: state.whatsapp,
+          amount: state.amount,
+          quantity: state.quantity,
+          unitPrice: state.unitPrice,
+          mosque: state.mosque,
+          mosqueAddress: state.mosqueAddress,
+          mosqueLocation: state.mosqueLocation,
+          paymentMethod: "تحويل مصرفي",
+          bankName: BANK_DETAILS.bankName,
+          bankAccountNumber: BANK_DETAILS.accountNumber,
+          bankAccountHolder: BANK_DETAILS.accountHolder,
+          receiptUrl,
+          receiptFileName: receiptFile.name,
+          status: "بانتظار مراجعة الإيصال",
+          country: "ليبيا",
+          timestamp: new Date(),
+        }),
+        "تم رفع الصورة لكن تعذر تسجيل بيانات التحويل في Firestore."
+      );
 
       setMessage({
         type: "success",
         text: "تم استلام إيصال التحويل. سنراجع العملية ونتواصل معك على واتساب.",
       });
     } catch (err) {
+      console.error("Bank transfer receipt error:", err);
       setMessage({
         type: "error",
-        text: err.message || "تعذر تسجيل الإيصال. حاول مرة أخرى.",
+        text: `تعذر تسجيل الإيصال: ${formatFirebaseError(err)}`,
       });
     } finally {
       setIsLoading(false);
+      setLoadingText("");
     }
   };
 
@@ -178,7 +205,7 @@ export default function BankTransfer() {
           <button className="btn-primary" onClick={saveRequest} disabled={isLoading}>
             {isLoading ? (
               <>
-                <span className="spinner" /> جاري تسجيل الإيصال...
+                <span className="spinner" /> {loadingText || "جاري تسجيل الإيصال..."}
               </>
             ) : (
               "تسجيل إيصال التحويل"
