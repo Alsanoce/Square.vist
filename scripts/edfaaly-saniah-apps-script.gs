@@ -19,7 +19,7 @@ const CONFIG = {
   // If empty, the script creates a new spreadsheet automatically and stores its ID in Script Properties.
   SPREADSHEET_ID: "",
   SPREADSHEET_NAME: "سقيا ماء - عمليات الدفع",
-  SHEET_NAME: "Transactions",
+  SHEET_NAME: "edfaly pyment",
 
   BANK_ENDPOINT: "http://62.240.55.2:6187/BCDUssd/NewEdfali.asmx",
 
