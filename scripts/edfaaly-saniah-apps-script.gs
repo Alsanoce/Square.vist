@@ -20,6 +20,7 @@ const CONFIG = {
   SPREADSHEET_ID: "",
   SPREADSHEET_NAME: "سقيا ماء - عمليات الدفع",
   SHEET_NAME: "edfaly pyment",
+  BANK_TRANSFER_SHEET_NAME: "bank transfer",
 
   BANK_ENDPOINT: "http://62.240.55.2:6187/BCDUssd/NewEdfali.asmx",
 
@@ -60,6 +61,8 @@ function doGet(e) {
       result = handleTestTelegram();
     } else if (action === "telegramStatus") {
       result = handleTelegramStatus();
+    } else if (action === "saveBankTransfer") {
+      result = handleSaveBankTransfer(e);
     } else if (action === "health") {
       result = { success: true, message: "Saniah payment API is running" };
     } else {
@@ -69,6 +72,60 @@ function doGet(e) {
     return jsonp(callback, result);
   } catch (err) {
     return jsonp(callback, { success: false, message: err.message || String(err) });
+  }
+}
+
+function handleSaveBankTransfer(e) {
+  const data = {
+    date: new Date(),
+    transactionId: getParam(e, "transactionId"),
+    donorName: getParam(e, "donorName"),
+    donorPhone: getParam(e, "donorPhone"),
+    amount: normalizeAmount(getParam(e, "amount")),
+    quantity: getParam(e, "quantity"),
+    mosque: getParam(e, "mosque"),
+    receiptUrl: getParam(e, "receiptUrl"),
+    status: getParam(e, "status", "pending_review"),
+    notes: getParam(e, "notes"),
+  };
+
+  if (!data.donorName || !data.donorPhone || !data.amount || !data.receiptUrl) {
+    return {
+      success: false,
+      message: "missing bank transfer fields",
+      data,
+    };
+  }
+
+  try {
+    getBankTransferSheet().appendRow([
+      data.date,
+      data.transactionId,
+      data.donorName,
+      data.donorPhone,
+      data.amount,
+      data.quantity,
+      data.mosque,
+      data.receiptUrl,
+      data.status,
+      data.notes,
+    ]);
+
+    notifyTelegramBankTransfer(data);
+
+    return {
+      success: true,
+      message: "bank transfer saved",
+      sheetName: CONFIG.BANK_TRANSFER_SHEET_NAME,
+      data,
+    };
+  } catch (err) {
+    Logger.log(`handleSaveBankTransfer error: ${err.message}`);
+    return {
+      success: false,
+      message: err.message || String(err),
+      sheetName: CONFIG.BANK_TRANSFER_SHEET_NAME,
+    };
   }
 }
 
@@ -344,6 +401,29 @@ function getSheet() {
   return sheet;
 }
 
+function getBankTransferSheet() {
+  const ss = getSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.BANK_TRANSFER_SHEET_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.BANK_TRANSFER_SHEET_NAME);
+    sheet.appendRow([
+      "date",
+      "transactionId",
+      "donorName",
+      "donorPhone",
+      "amount",
+      "quantity",
+      "mosque",
+      "receiptUrl",
+      "status",
+      "notes",
+    ]);
+  }
+
+  return sheet;
+}
+
 function logTransaction(entry) {
   const lock = LockService.getScriptLock();
 
@@ -453,6 +533,38 @@ function notifyTelegramPaymentSuccess(entry) {
     return sent;
   } catch (err) {
     Logger.log(`telegram notify error: ${err.message}`);
+    return {
+      success: false,
+      message: err.message || String(err),
+    };
+  }
+}
+
+function notifyTelegramBankTransfer(data) {
+  try {
+    const lines = [
+      "طلب تحويل مصرفي جديد",
+      "",
+      `رقم العملية: ${data.transactionId || "-"}`,
+      `المتبرع: ${data.donorName || "-"}`,
+      `رقم الهاتف: ${data.donorPhone || "-"}`,
+      `المبلغ: ${data.amount || "-"} دينار`,
+      `عدد الكراتين: ${data.quantity || "-"}`,
+      `المسجد: ${data.mosque || "-"}`,
+      `الحالة: ${data.status || "pending_review"}`,
+      "",
+      `رابط الإيصال: ${data.receiptUrl || "-"}`,
+    ];
+
+    const sent = sendTelegramMessage(lines.join("\n"));
+
+    if (!sent.success) {
+      Logger.log(`bank transfer telegram failed: ${sent.message}`);
+    }
+
+    return sent;
+  } catch (err) {
+    Logger.log(`notifyTelegramBankTransfer error: ${err.message}`);
     return {
       success: false,
       message: err.message || String(err),

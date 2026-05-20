@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "../firebase";
+import { callEdfaaly } from "../lib/edfaalyApi";
 
 const BANK_DETAILS = {
   bankName: "مصرف التجارة والتنمية",
@@ -89,6 +90,26 @@ export default function BankTransfer() {
     );
   };
 
+  const saveBankTransferToSheet = async (receiptUrl) => {
+    const response = await callEdfaaly("saveBankTransfer", {
+      transactionId: state.transactionId || "",
+      donorName: state.donorName || "",
+      donorPhone: state.whatsapp || state.phone || "",
+      amount: state.amount || "",
+      quantity: state.quantity || "",
+      mosque: state.mosque || "",
+      receiptUrl,
+      status: "pending_review",
+      notes: "بانتظار مراجعة الإيصال",
+    });
+
+    if (!response?.success) {
+      throw new Error(response?.message || "تعذر تسجيل التحويل في Google Sheet.");
+    }
+
+    return response;
+  };
+
   const saveRequest = async () => {
     if (isLoading) return;
 
@@ -105,6 +126,11 @@ export default function BankTransfer() {
       const receiptUrl = await uploadReceipt();
 
       setLoadingText("جاري تسجيل بيانات التحويل...");
+
+      await withTimeout(
+        saveBankTransferToSheet(receiptUrl),
+        "تم رفع الصورة لكن تعذر تسجيل التحويل في Google Sheet."
+      );
 
       await withTimeout(
         addDoc(collection(db, "payment_requests"), {
