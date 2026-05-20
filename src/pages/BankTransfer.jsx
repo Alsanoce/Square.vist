@@ -8,6 +8,7 @@ const BANK_DETAILS = {
   bankName: "مصرف التجارة والتنمية",
   accountNumber: "0015247166001",
   accountHolder: "السنوسي سعد جمعة",
+  logo: "/payment-icons/commerce-development-bank.jpeg",
 };
 
 function withTimeout(promise, message, timeoutMs = 30000) {
@@ -31,6 +32,7 @@ export default function BankTransfer() {
   const [receiptFile, setReceiptFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
+  const [accountCopied, setAccountCopied] = useState(false);
 
   const receiptPreview = useMemo(() => {
     if (!receiptFile) return "";
@@ -145,6 +147,16 @@ export default function BankTransfer() {
     }
   };
 
+  const copyAccountNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(BANK_DETAILS.accountNumber);
+      setAccountCopied(true);
+      window.setTimeout(() => setAccountCopied(false), 1800);
+    } catch (err) {
+      setMessage({ type: "error", text: "تعذر نسخ رقم الحساب. انسخه يدوياً من الحقل." });
+    }
+  };
+
   if (!state) return null;
 
   return (
@@ -159,7 +171,7 @@ export default function BankTransfer() {
 
         <div className="card" style={s.card}>
           <div style={s.bankHeader}>
-            <div style={s.bankLogo}>CTD</div>
+            <img src={BANK_DETAILS.logo} alt={BANK_DETAILS.bankName} style={s.bankLogo} />
             <div>
               <strong style={s.bankName}>{BANK_DETAILS.bankName}</strong>
               <span style={s.bankCaption}>بيانات التحويل المصرفي</span>
@@ -172,7 +184,14 @@ export default function BankTransfer() {
           </div>
 
           <div style={s.detailsBox}>
-            <DetailRow label="رقم الحساب" value={BANK_DETAILS.accountNumber} dir="ltr" />
+            <DetailRow
+              label="رقم الحساب"
+              value={BANK_DETAILS.accountNumber}
+              dir="ltr"
+              copyable
+              copied={accountCopied}
+              onCopy={copyAccountNumber}
+            />
             <DetailRow label="صاحب الحساب" value={BANK_DETAILS.accountHolder} />
             <DetailRow label="المصرف" value={BANK_DETAILS.bankName} />
           </div>
@@ -221,11 +240,24 @@ export default function BankTransfer() {
   );
 }
 
-function DetailRow({ label, value, dir }) {
+function DetailRow({ label, value, dir, copyable, copied, onCopy }) {
   return (
     <div style={s.detailRow}>
       <span>{label}</span>
-      <strong dir={dir}>{value}</strong>
+      <span style={s.detailValueWrap}>
+        {copyable && (
+          <button
+            type="button"
+            onClick={onCopy}
+            style={s.copyBtn}
+            title="نسخ رقم الحساب"
+            aria-label="نسخ رقم الحساب"
+          >
+            {copied ? "✓" : "⧉"}
+          </button>
+        )}
+        <strong dir={dir}>{value}</strong>
+      </span>
     </div>
   );
 }
@@ -241,17 +273,13 @@ const s = {
     marginBottom: "1.2rem",
   },
   bankLogo: {
-    width: 62,
-    height: 62,
-    display: "grid",
-    placeItems: "center",
+    width: 72,
+    height: 72,
+    objectFit: "contain",
     borderRadius: 14,
-    background: "linear-gradient(135deg, #0b7f5b, #12b886)",
-    color: "#fff",
-    fontFamily: "'Cairo', sans-serif",
-    fontSize: "1.15rem",
-    fontWeight: 900,
-    letterSpacing: 0,
+    background: "#fff",
+    padding: "0.35rem",
+    flexShrink: 0,
   },
   bankName: {
     display: "block",
@@ -288,9 +316,31 @@ const s = {
   detailRow: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: "1rem",
     color: "var(--text-muted)",
     fontSize: "0.9rem",
+  },
+  detailValueWrap: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.55rem",
+    color: "var(--white)",
+  },
+  copyBtn: {
+    width: 34,
+    height: 34,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    border: "1px solid rgba(0,212,255,0.28)",
+    background: "rgba(0,212,255,0.08)",
+    color: "var(--cyan)",
+    cursor: "pointer",
+    fontSize: "1rem",
+    fontWeight: 900,
+    lineHeight: 1,
   },
   uploadBox: {
     minHeight: 150,

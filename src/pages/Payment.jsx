@@ -20,6 +20,7 @@ const METHODS = [
     id: "bank",
     title: "تحويل مصرفي",
     description: "نسجل طلبك ونتواصل معك ببيانات التحويل المصرفي.",
+    icon: "/payment-icons/commerce-development-bank.jpeg",
     path: "/payment/bank",
   },
 ];
