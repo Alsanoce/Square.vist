@@ -1,6 +1,5 @@
 export const DONATION_PACKAGES = [
-  { quantity: 1, total: 7 },
-  { quantity: 3, total: 21 },
+  { quantity: 4, total: 28 },
   { quantity: 5, total: 35 },
   { quantity: 10, total: 70 },
   { quantity: 20, total: 140 },
