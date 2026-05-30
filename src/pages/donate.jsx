@@ -20,6 +20,8 @@ export default function Donate() {
   const selectedPackage = getDonationPackage(quantity);
   const total = selectedPackage.total;
   const unitPrice = total / selectedPackage.quantity;
+  const canSelectMosque = selectedPackage.quantity >= 10;
+  const distributionType = canSelectMosque ? "selected_mosque" : "nearest_mosque";
 
   const getMapsSearchUrl = () => {
     const query = [mosque.trim(), mosqueAddress.trim(), "بنغازي", "ليبيا"]
@@ -75,20 +77,24 @@ export default function Donate() {
       return;
     }
 
-    if (!mosqueName) {
+    if (canSelectMosque && !mosqueName) {
       setError("يرجى كتابة اسم المسجد");
       return;
     }
 
-    if (!address) {
+    if (canSelectMosque && !address) {
       setError("يرجى كتابة عنوان المسجد");
       return;
     }
 
-    if (!location) {
+    if (canSelectMosque && !location) {
       setError("يرجى الضغط على زر استخدام موقعي الحالي لإضافة موقع المسجد");
       return;
     }
+
+    const paymentMosque = canSelectMosque ? mosqueName : "أقرب مسجد";
+    const paymentMosqueAddress = canSelectMosque ? address : "يتم التوزيع على أقرب مسجد داخل بنغازي";
+    const paymentMosqueLocation = canSelectMosque ? location : "";
 
     navigate("/payment", {
       state: {
@@ -99,9 +105,10 @@ export default function Donate() {
         amount: total,
         quantity: selectedPackage.quantity,
         unitPrice,
-        mosque: mosqueName,
-        mosqueAddress: address,
-        mosqueLocation: location,
+        mosque: paymentMosque,
+        mosqueAddress: paymentMosqueAddress,
+        mosqueLocation: paymentMosqueLocation,
+        distributionType,
       },
     });
   };
@@ -122,9 +129,9 @@ export default function Donate() {
             <div style={s.priceLabel}>أقل تبرع</div>
             <div style={s.priceValue}>
               <span style={s.priceCurrency}>دينار </span>
-              100
+              {DONATION_PACKAGES[0].total}
             </div>
-            <p style={s.packageHint}>10 كراتين ماء، وكلما زاد العدد صار سعر الكرتونة أقل.</p>
+            <p style={s.packageHint}>اختر عدد الكراتين، وكلما زاد العدد صار سعر الكرتونة أقل.</p>
           </div>
 
           <div className="form-group">
@@ -150,44 +157,6 @@ export default function Donate() {
           </div>
 
           <div className="form-group">
-            <label>اسم المسجد</label>
-            <input
-              type="text"
-              value={mosque}
-              onChange={(e) => setMosque(e.target.value)}
-              placeholder="اكتب اسم المسجد"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>عنوان المسجد</label>
-            <input
-              type="text"
-              value={mosqueAddress}
-              onChange={(e) => setMosqueAddress(e.target.value)}
-              placeholder="مثال: بنغازي، منطقة ..."
-            />
-          </div>
-
-          <div className="form-group">
-            <label>موقع المسجد على خرائط Google</label>
-            <div style={s.locationActions}>
-              <button type="button" onClick={useCurrentLocation} disabled={isLocating} style={s.locationButton}>
-                {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
-              </button>
-              <button type="button" onClick={openGoogleMaps} style={s.mapButton}>
-                افتح خرائط Google
-              </button>
-            </div>
-            {mosqueLocation && (
-              <a href={mosqueLocation} target="_blank" rel="noreferrer" style={s.locationLink}>
-                تم تحديد الموقع - عرض على الخريطة
-              </a>
-            )}
-            <p style={s.fieldHint}>عند الضغط على استخدام موقعي الحالي سيطلب المتصفح السماح بتحديد الموقع.</p>
-          </div>
-
-          <div className="form-group">
             <label>عدد كراتين الماء</label>
             <div style={s.packageGrid}>
               {DONATION_PACKAGES.map((item) => {
@@ -210,8 +179,55 @@ export default function Donate() {
                 );
               })}
             </div>
+            <div style={s.distributionNote}>
+              {canSelectMosque
+                ? "للتبرعات من 10 كراتين أو أكثر، يمكنك تحديد مسجد داخل نطاق مدينة بنغازي."
+                : "للتبرعات أقل من 10 كراتين، سيتم توزيع المياه على أقرب مسجد داخل مدينة بنغازي."
+              }
+            </div>
           </div>
 
+          {canSelectMosque && (
+            <>
+              <div className="form-group">
+                <label>اسم المسجد</label>
+                <input
+                  type="text"
+                  value={mosque}
+                  onChange={(e) => setMosque(e.target.value)}
+                  placeholder="اكتب اسم المسجد"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>عنوان المسجد</label>
+                <input
+                  type="text"
+                  value={mosqueAddress}
+                  onChange={(e) => setMosqueAddress(e.target.value)}
+                  placeholder="مثال: بنغازي، منطقة ..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>موقع المسجد على خرائط Google</label>
+                <div style={s.locationActions}>
+                  <button type="button" onClick={useCurrentLocation} disabled={isLocating} style={s.locationButton}>
+                    {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
+                  </button>
+                  <button type="button" onClick={openGoogleMaps} style={s.mapButton}>
+                    افتح خرائط Google
+                  </button>
+                </div>
+                {mosqueLocation && (
+                  <a href={mosqueLocation} target="_blank" rel="noreferrer" style={s.locationLink}>
+                    تم تحديد الموقع - عرض على الخريطة
+                  </a>
+                )}
+                <p style={s.fieldHint}>عند الضغط على استخدام موقعي الحالي سيطلب المتصفح السماح بتحديد الموقع.</p>
+              </div>
+            </>
+          )}
           <div className="total-box">
             <span>المبلغ الإجمالي: </span>
             <strong>{total} دينار</strong>
@@ -271,6 +287,16 @@ const s = {
     fontSize: "0.78rem",
     lineHeight: 1.7,
     marginTop: "0.45rem",
+  },
+  distributionNote: {
+    color: "var(--text-muted)",
+    background: "rgba(0,212,255,0.08)",
+    border: "1px solid rgba(0,212,255,0.16)",
+    borderRadius: 12,
+    fontSize: "0.84rem",
+    lineHeight: 1.7,
+    marginTop: "0.85rem",
+    padding: "0.75rem 0.9rem",
   },
   locationActions: {
     display: "grid",
