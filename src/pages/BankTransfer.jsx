@@ -11,6 +11,10 @@ const BANK_DETAILS = {
   accountHolder: "السنوسي سعد جمعة",
   logo: "/payment-icons/commerce-development-bank.jpeg",
 };
+const ALLOWED_RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
+const INVALID_RECEIPT_MESSAGE = "يرجى رفع صورة إيصال بصيغة JPG أو PNG أو WEBP وبحجم أقل من 5MB";
+const RECEIPT_UPLOAD_ERROR_MESSAGE = "تعذر رفع الإيصال. تأكد من تفعيل Firebase Storage وضبط CORS و Storage Rules.";
 
 function withTimeout(promise, message, timeoutMs = 30000) {
   return Promise.race([
@@ -24,6 +28,25 @@ function withTimeout(promise, message, timeoutMs = 30000) {
 function formatFirebaseError(err) {
   const code = err?.code ? ` (${err.code})` : "";
   return `${err?.message || "حدث خطأ غير معروف"}${code}`;
+}
+
+function isStorageUploadError(err) {
+  const details = `${err?.code || ""} ${err?.message || ""}`.toLowerCase();
+  return (
+    details.includes("cors") ||
+    details.includes("404") ||
+    details.includes("network") ||
+    details.includes("storage/unknown") ||
+    details.includes("firebase storage")
+  );
+}
+
+function getReceiptExtension(file) {
+  return {
+    "image/jpeg": "jpeg",
+    "image/png": "png",
+    "image/webp": "webp",
+  }[file.type] || "jpeg";
 }
 
 export default function BankTransfer() {
@@ -59,15 +82,10 @@ export default function BankTransfer() {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
+    if (!ALLOWED_RECEIPT_TYPES.includes(file.type) || file.size > MAX_RECEIPT_SIZE) {
       setReceiptFile(null);
-      setMessage({ type: "error", text: "يرجى اختيار صورة إيصال بصيغة صورة." });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setReceiptFile(null);
-      setMessage({ type: "error", text: "حجم الصورة كبير. الحد الأقصى 5MB." });
+      event.target.value = "";
+      setMessage({ type: "error", text: INVALID_RECEIPT_MESSAGE });
       return;
     }
 
@@ -76,21 +94,24 @@ export default function BankTransfer() {
 
   const uploadReceipt = async () => {
     const safeTransactionId = state.transactionId || `bank-${Date.now()}`;
-    const extension = receiptFile.name.split(".").pop() || "jpg";
-    const receiptRef = ref(storage, `bank-receipts/${safeTransactionId}.${extension}`);
+    const extension = getReceiptExtension(receiptFile);
+    const receiptPath = `bank-receipts/${safeTransactionId}.${extension}`;
+    const receiptRef = ref(storage, receiptPath);
 
     await withTimeout(
       uploadBytes(receiptRef, receiptFile, { contentType: receiptFile.type }),
       "انتهت مهلة رفع صورة الإيصال. تأكد من تفعيل Firebase Storage وصلاحياته."
     );
 
-    return withTimeout(
+    const receiptUrl = await withTimeout(
       getDownloadURL(receiptRef),
       "تم رفع الصورة لكن تعذر جلب رابط الإيصال من Firebase Storage."
     );
+
+    return { receiptUrl, receiptPath };
   };
 
-  const saveBankTransferToSheet = async (receiptUrl) => {
+  const saveBankTransferToSheet = async (receiptUrl, receiptPath) => {
     const response = await callEdfaaly("saveBankTransfer", {
       transactionId: state.transactionId || "",
       donorName: state.donorName || "",
@@ -99,6 +120,7 @@ export default function BankTransfer() {
       quantity: state.quantity || "",
       mosque: state.mosque || "",
       receiptUrl,
+      receiptPath,
       status: "pending_review",
       notes: "بانتظار مراجعة الإيصال",
     });
@@ -123,12 +145,12 @@ export default function BankTransfer() {
     setMessage(null);
 
     try {
-      const receiptUrl = await uploadReceipt();
+      const { receiptUrl, receiptPath } = await uploadReceipt();
 
       setLoadingText("جاري تسجيل بيانات التحويل...");
 
       await withTimeout(
-        saveBankTransferToSheet(receiptUrl),
+        saveBankTransferToSheet(receiptUrl, receiptPath),
         "تم رفع الصورة لكن تعذر تسجيل التحويل في Google Sheet."
       );
 
@@ -149,6 +171,7 @@ export default function BankTransfer() {
           bankAccountNumber: BANK_DETAILS.accountNumber,
           bankAccountHolder: BANK_DETAILS.accountHolder,
           receiptUrl,
+          receiptPath,
           receiptFileName: receiptFile.name,
           status: "بانتظار مراجعة الإيصال",
           country: "ليبيا",
@@ -162,10 +185,10 @@ export default function BankTransfer() {
         text: "تم استلام إيصال التحويل. سنراجع العملية ونتواصل معك على واتساب.",
       });
     } catch (err) {
-      console.error("Bank transfer receipt error:", err);
+      console.error("Receipt upload failed:", err);
       setMessage({
         type: "error",
-        text: `تعذر تسجيل الإيصال: ${formatFirebaseError(err)}`,
+        text: isStorageUploadError(err) ? RECEIPT_UPLOAD_ERROR_MESSAGE : `تعذر تسجيل الإيصال: ${formatFirebaseError(err)}`,
       });
     } finally {
       setIsLoading(false);
@@ -226,7 +249,7 @@ export default function BankTransfer() {
             <input
               id="receipt-upload"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleReceiptChange}
               style={s.fileInput}
             />
