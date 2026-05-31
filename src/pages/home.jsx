@@ -27,13 +27,17 @@ function useCountUp(ref, target, duration = 1800) {
   useEffect(() => {
     if (!ref.current) return;
     let start = null;
+    let frameId = 0;
     const step = (ts) => {
+      if (!ref.current) return;
       if (!start) start = ts;
       const progress = Math.min((ts - start) / duration, 1);
       ref.current.textContent = Math.floor(progress * target).toLocaleString("ar-EG");
-      if (progress < 1) requestAnimationFrame(step);
+      if (progress < 1) frameId = requestAnimationFrame(step);
     };
-    requestAnimationFrame(step);
+    frameId = requestAnimationFrame(step);
+
+    return () => cancelAnimationFrame(frameId);
   }, [ref, target, duration]);
 }
 

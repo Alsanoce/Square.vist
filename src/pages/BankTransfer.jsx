@@ -11,6 +11,8 @@ import {
 
 const BANK_LOGO = "/payment-icons/commerce-development-bank.jpeg";
 const REQUEST_ERROR = "حدث خطأ أثناء تسجيل طلب الحوالة، يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.";
+const BACKEND_ACTION_ERROR =
+  "خادم الدفع لم يتم تحديثه بعد. يرجى نشر نسخة Google Apps Script الجديدة ثم المحاولة مرة أخرى.";
 
 export default function BankTransfer() {
   const { state } = useLocation();
@@ -86,6 +88,9 @@ export default function BankTransfer() {
       const response = await callEdfaaly("createBankTransferRequest", payload);
 
       if (!response?.success) {
+        if (response?.message === "invalid action") {
+          throw new Error(BACKEND_ACTION_ERROR);
+        }
         throw new Error(response?.message || REQUEST_ERROR);
       }
 
@@ -99,7 +104,7 @@ export default function BankTransfer() {
       });
     } catch (error) {
       console.error("Bank transfer request failed:", error);
-      setMessage({ type: "error", text: REQUEST_ERROR });
+      setMessage({ type: "error", text: error.message === BACKEND_ACTION_ERROR ? BACKEND_ACTION_ERROR : REQUEST_ERROR });
       setIsLoading(false);
     }
   };
