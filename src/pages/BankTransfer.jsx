@@ -1,212 +1,108 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { collection, addDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { db, storage } from "../firebase";
 import { callEdfaaly } from "../lib/edfaalyApi";
+import {
+  BANK_TRANSFER_INFO,
+  buildBankTransferWhatsappLink,
+  buildBankTransferWhatsappMessage,
+  createBankTransferTransactionId,
+  getBankTransferDonationDetails,
+} from "../lib/bankTransfer";
 
-const BANK_DETAILS = {
-  bankName: "مصرف التجارة والتنمية",
-  accountNumber: "0015247166001",
-  accountHolder: "السنوسي سعد جمعة",
-  logo: "/payment-icons/commerce-development-bank.jpeg",
-};
-const ALLOWED_RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
-const INVALID_RECEIPT_MESSAGE = "يرجى رفع صورة إيصال بصيغة JPG أو PNG أو WEBP وبحجم أقل من 5MB";
-const RECEIPT_UPLOAD_ERROR_MESSAGE = "تعذر رفع الإيصال. تأكد من تفعيل Firebase Storage وضبط CORS و Storage Rules.";
-
-function withTimeout(promise, message, timeoutMs = 30000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error(message)), timeoutMs);
-    }),
-  ]);
-}
-
-function formatFirebaseError(err) {
-  const code = err?.code ? ` (${err.code})` : "";
-  return `${err?.message || "حدث خطأ غير معروف"}${code}`;
-}
-
-function isStorageUploadError(err) {
-  const details = `${err?.code || ""} ${err?.message || ""}`.toLowerCase();
-  return (
-    details.includes("cors") ||
-    details.includes("404") ||
-    details.includes("network") ||
-    details.includes("storage/unknown") ||
-    details.includes("firebase storage")
-  );
-}
-
-function getReceiptExtension(file) {
-  return {
-    "image/jpeg": "jpeg",
-    "image/png": "png",
-    "image/webp": "webp",
-  }[file.type] || "jpeg";
-}
+const BANK_LOGO = "/payment-icons/commerce-development-bank.jpeg";
+const REQUEST_ERROR = "حدث خطأ أثناء تسجيل طلب الحوالة، يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.";
 
 export default function BankTransfer() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const [message, setMessage] = useState(null);
-  const [receiptFile, setReceiptFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState("");
   const [accountCopied, setAccountCopied] = useState(false);
-
-  const receiptPreview = useMemo(() => {
-    if (!receiptFile) return "";
-    return URL.createObjectURL(receiptFile);
-  }, [receiptFile]);
+  const [bankTransactionId] = useState(() => state?.bankTransferTransactionId || createBankTransferTransactionId());
 
   useEffect(() => {
     if (!state?.phone || !state?.mosque) navigate("/donate");
   }, [navigate, state]);
 
-  useEffect(() => {
-    return () => {
-      if (receiptPreview) URL.revokeObjectURL(receiptPreview);
-    };
-  }, [receiptPreview]);
+  if (!state) return null;
 
-  const handleReceiptChange = (event) => {
-    const file = event.target.files?.[0];
-    setMessage(null);
-
-    if (!file) {
-      setReceiptFile(null);
-      return;
-    }
-
-    if (!ALLOWED_RECEIPT_TYPES.includes(file.type) || file.size > MAX_RECEIPT_SIZE) {
-      setReceiptFile(null);
-      event.target.value = "";
-      setMessage({ type: "error", text: INVALID_RECEIPT_MESSAGE });
-      return;
-    }
-
-    setReceiptFile(file);
+  const donationDetails = getBankTransferDonationDetails(state);
+  const confirmationDetails = {
+    ...state,
+    ...donationDetails,
+    transactionId: bankTransactionId,
+    paymentMethod: "حوالة مصرفية",
+    country: "ليبيا",
+    city: "بنغازي",
+    status: "بانتظار صورة الحوالة",
+    receiptSource: "WhatsApp",
   };
-
-  const uploadReceipt = async () => {
-    const safeTransactionId = state.transactionId || `bank-${Date.now()}`;
-    const extension = getReceiptExtension(receiptFile);
-    const receiptPath = `bank-receipts/${safeTransactionId}.${extension}`;
-    const receiptRef = ref(storage, receiptPath);
-
-    await withTimeout(
-      uploadBytes(receiptRef, receiptFile, { contentType: receiptFile.type }),
-      "انتهت مهلة رفع صورة الإيصال. تأكد من تفعيل Firebase Storage وصلاحياته."
-    );
-
-    const receiptUrl = await withTimeout(
-      getDownloadURL(receiptRef),
-      "تم رفع الصورة لكن تعذر جلب رابط الإيصال من Firebase Storage."
-    );
-
-    return { receiptUrl, receiptPath };
-  };
-
-  const saveBankTransferToSheet = async (receiptUrl, receiptPath) => {
-    const response = await callEdfaaly("saveBankTransfer", {
-      transactionId: state.transactionId || "",
-      donorName: state.donorName || "",
-      donorPhone: state.whatsapp || state.phone || "",
-      amount: state.amount || "",
-      quantity: state.quantity || "",
-      mosque: state.mosque || "",
-      receiptUrl,
-      receiptPath,
-      status: "pending_review",
-      notes: "بانتظار مراجعة الإيصال",
-    });
-
-    if (!response?.success) {
-      throw new Error(response?.message || "تعذر تسجيل التحويل في Google Sheet.");
-    }
-
-    return response;
-  };
-
-  const saveRequest = async () => {
-    if (isLoading) return;
-
-    if (!receiptFile) {
-      setMessage({ type: "error", text: "يرجى إضافة صورة إيصال التحويل قبل تسجيل الطلب." });
-      return;
-    }
-
-    setIsLoading(true);
-    setLoadingText("جاري رفع صورة الإيصال...");
-    setMessage(null);
-
-    try {
-      const { receiptUrl, receiptPath } = await uploadReceipt();
-
-      setLoadingText("جاري تسجيل بيانات التحويل...");
-
-      await withTimeout(
-        saveBankTransferToSheet(receiptUrl, receiptPath),
-        "تم رفع الصورة لكن تعذر تسجيل التحويل في Google Sheet."
-      );
-
-      await withTimeout(
-        addDoc(collection(db, "payment_requests"), {
-          transactionId: state.transactionId || "",
-          donorName: state.donorName,
-          phone: state.phone,
-          whatsapp: state.whatsapp,
-          amount: state.amount,
-          quantity: state.quantity,
-          unitPrice: state.unitPrice,
-          mosque: state.mosque,
-          mosqueAddress: state.mosqueAddress,
-          mosqueLocation: state.mosqueLocation,
-          paymentMethod: "تحويل مصرفي",
-          bankName: BANK_DETAILS.bankName,
-          bankAccountNumber: BANK_DETAILS.accountNumber,
-          bankAccountHolder: BANK_DETAILS.accountHolder,
-          receiptUrl,
-          receiptPath,
-          receiptFileName: receiptFile.name,
-          status: "بانتظار مراجعة الإيصال",
-          country: "ليبيا",
-          timestamp: new Date(),
-        }),
-        "تم رفع الصورة لكن تعذر تسجيل بيانات التحويل في Firestore."
-      );
-
-      setMessage({
-        type: "success",
-        text: "تم استلام إيصال التحويل. سنراجع العملية ونتواصل معك على واتساب.",
-      });
-    } catch (err) {
-      console.error("Receipt upload failed:", err);
-      setMessage({
-        type: "error",
-        text: isStorageUploadError(err) ? RECEIPT_UPLOAD_ERROR_MESSAGE : `تعذر تسجيل الإيصال: ${formatFirebaseError(err)}`,
-      });
-    } finally {
-      setIsLoading(false);
-      setLoadingText("");
-    }
-  };
+  const whatsappMessage = buildBankTransferWhatsappMessage({
+    ...confirmationDetails,
+    phone: state.phone || `+218${state.whatsapp || ""}`,
+  });
+  const whatsappLink = buildBankTransferWhatsappLink(whatsappMessage);
 
   const copyAccountNumber = async () => {
     try {
-      await navigator.clipboard.writeText(BANK_DETAILS.accountNumber);
+      await navigator.clipboard.writeText(BANK_TRANSFER_INFO.accountNumber);
       setAccountCopied(true);
       window.setTimeout(() => setAccountCopied(false), 1800);
-    } catch (err) {
+    } catch (error) {
       setMessage({ type: "error", text: "تعذر نسخ رقم الحساب. انسخه يدوياً من الحقل." });
     }
   };
 
-  if (!state) return null;
+  const submitBankTransferRequest = async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const payload = {
+        action: "createBankTransferRequest",
+        transactionId: bankTransactionId,
+        donorName: state.donorName || "",
+        phone: state.phone || "",
+        whatsapp: state.whatsapp || "",
+        amount: state.amount || "",
+        quantity: state.quantity || "",
+        unitPrice: state.unitPrice || "",
+        mosque: donationDetails.mosque,
+        mosqueAddress: donationDetails.mosqueAddress,
+        mosqueLocation: donationDetails.mosqueLocation,
+        distributionType: donationDetails.distributionType,
+        paymentMethod: "حوالة مصرفية",
+        country: "ليبيا",
+        city: "بنغازي",
+        status: "بانتظار صورة الحوالة",
+        receiptSource: "WhatsApp",
+        createdAt: new Date().toISOString(),
+        whatsappMessage,
+        whatsappLink,
+      };
+
+      const response = await callEdfaaly("createBankTransferRequest", payload);
+
+      if (!response?.success) {
+        throw new Error(response?.message || REQUEST_ERROR);
+      }
+
+      navigate("/payment/bank/confirmation", {
+        state: {
+          ...confirmationDetails,
+          whatsappMessage,
+          whatsappLink,
+          bankInfo: BANK_TRANSFER_INFO,
+        },
+      });
+    } catch (error) {
+      console.error("Bank transfer request failed:", error);
+      setMessage({ type: "error", text: REQUEST_ERROR });
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="page-wrapper">
@@ -214,18 +110,22 @@ export default function BankTransfer() {
         <div style={s.header}>
           <span className="section-tag">الدفع</span>
           <h1 className="section-title">
-            <span>تحويل مصرفي</span>
+            <span>حوالة مصرفية</span>
           </h1>
         </div>
 
         <div className="card" style={s.card}>
           <div style={s.bankHeader}>
-            <img src={BANK_DETAILS.logo} alt={BANK_DETAILS.bankName} style={s.bankLogo} />
+            <img src={BANK_LOGO} alt={BANK_TRANSFER_INFO.bankName} style={s.bankLogo} />
             <div>
-              <strong style={s.bankName}>{BANK_DETAILS.bankName}</strong>
+              <strong style={s.bankName}>{BANK_TRANSFER_INFO.bankName}</strong>
               <span style={s.bankCaption}>بيانات التحويل المصرفي</span>
             </div>
           </div>
+
+          <p style={s.instruction}>
+            الرجاء تحويل المبلغ إلى الحساب البنكي الموضح أدناه، ثم إرسال صورة الحوالة عبر واتساب مع رقم العملية.
+          </p>
 
           <div style={s.amountBox}>
             <span>قيمة الدفع</span>
@@ -233,36 +133,20 @@ export default function BankTransfer() {
           </div>
 
           <div style={s.detailsBox}>
+            <DetailRow label="رقم العملية" value={bankTransactionId} dir="ltr" />
+            <DetailRow label="المصرف" value={BANK_TRANSFER_INFO.bankName} />
+            <DetailRow label="صاحب الحساب" value={BANK_TRANSFER_INFO.accountName} />
             <DetailRow
               label="رقم الحساب"
-              value={BANK_DETAILS.accountNumber}
+              value={BANK_TRANSFER_INFO.accountNumber}
               dir="ltr"
               copyable
               copied={accountCopied}
               onCopy={copyAccountNumber}
             />
-            <DetailRow label="صاحب الحساب" value={BANK_DETAILS.accountHolder} />
-            <DetailRow label="المصرف" value={BANK_DETAILS.bankName} />
           </div>
 
-          <label htmlFor="receipt-upload" style={s.uploadBox}>
-            <input
-              id="receipt-upload"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleReceiptChange}
-              style={s.fileInput}
-            />
-            {receiptPreview ? (
-              <img src={receiptPreview} alt="إيصال التحويل" style={s.receiptPreview} />
-            ) : (
-              <span style={s.uploadText}>إضافة صورة الإيصال</span>
-            )}
-          </label>
-
-          {receiptFile && <p style={s.fileName}>{receiptFile.name}</p>}
-
-          <p style={s.note}>بعد التحويل، أضف صورة الإيصال ثم اضغط تسجيل الإيصال حتى نراجع العملية.</p>
+          <p style={s.note}>لن يتم اعتماد التبرع إلا بعد مراجعة الحوالة وتأكيدها من الإدارة.</p>
 
           {message && (
             <div className={`alert ${message.type === "success" ? "alert-success" : "alert-danger"}`}>
@@ -270,13 +154,13 @@ export default function BankTransfer() {
             </div>
           )}
 
-          <button className="btn-primary" onClick={saveRequest} disabled={isLoading}>
+          <button className="btn-primary" onClick={submitBankTransferRequest} disabled={isLoading}>
             {isLoading ? (
               <>
-                <span className="spinner" /> {loadingText || "جاري تسجيل الإيصال..."}
+                <span className="spinner" /> جاري تسجيل طلب الحوالة...
               </>
             ) : (
-              "تسجيل إيصال التحويل"
+              "تسجيل طلب الحوالة"
             )}
           </button>
 
@@ -302,7 +186,7 @@ function DetailRow({ label, value, dir, copyable, copied, onCopy }) {
             title="نسخ رقم الحساب"
             aria-label="نسخ رقم الحساب"
           >
-            {copied ? "✓" : "⧉"}
+            {copied ? "تم النسخ ✓" : "نسخ"}
           </button>
         )}
         <strong dir={dir}>{value}</strong>
@@ -342,6 +226,12 @@ const s = {
     fontSize: "0.82rem",
     marginTop: "0.15rem",
   },
+  instruction: {
+    color: "var(--text-muted)",
+    lineHeight: 1.9,
+    marginBottom: "1rem",
+    textAlign: "center",
+  },
   amountBox: {
     display: "flex",
     justifyContent: "space-between",
@@ -369,61 +259,36 @@ const s = {
     gap: "1rem",
     color: "var(--text-muted)",
     fontSize: "0.9rem",
+    flexWrap: "wrap",
   },
   detailValueWrap: {
     display: "inline-flex",
     alignItems: "center",
     gap: "0.55rem",
     color: "var(--white)",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   copyBtn: {
-    width: 34,
-    height: 34,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 32,
     borderRadius: 10,
     border: "1px solid rgba(0,212,255,0.28)",
     background: "rgba(0,212,255,0.08)",
     color: "var(--cyan)",
     cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: 900,
-    lineHeight: 1,
-  },
-  uploadBox: {
-    minHeight: 150,
-    display: "grid",
-    placeItems: "center",
-    border: "1px dashed rgba(0,212,255,0.45)",
-    borderRadius: 14,
-    background: "rgba(255,255,255,0.04)",
-    cursor: "pointer",
-    overflow: "hidden",
-    marginBottom: "0.6rem",
-  },
-  fileInput: { display: "none" },
-  uploadText: {
-    color: "var(--cyan)",
+    fontFamily: "'Tajawal', sans-serif",
+    fontSize: "0.78rem",
     fontWeight: 800,
-  },
-  receiptPreview: {
-    width: "100%",
-    maxHeight: 260,
-    objectFit: "contain",
-    background: "rgba(0,0,0,0.18)",
-  },
-  fileName: {
-    color: "var(--success)",
-    fontSize: "0.82rem",
-    textAlign: "center",
-    marginBottom: "0.8rem",
-    wordBreak: "break-word",
+    padding: "0.3rem 0.65rem",
   },
   note: {
     color: "var(--text-muted)",
-    lineHeight: 1.9,
+    background: "rgba(255,193,7,0.08)",
+    border: "1px solid rgba(255,193,7,0.18)",
+    borderRadius: 12,
+    lineHeight: 1.8,
     marginBottom: "1rem",
+    padding: "0.75rem 0.9rem",
     textAlign: "center",
   },
   backBtn: {

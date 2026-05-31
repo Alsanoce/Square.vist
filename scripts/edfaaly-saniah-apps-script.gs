@@ -13,6 +13,11 @@
  * Frontend calls use JSONP:
  *   ?callback=cb&action=doPTrans&customerMobile=+2189...&amount=6
  *   ?callback=cb&action=onlineConfTrans&sessionID=...&otp=1234
+ *
+ * Telegram setup:
+ * Apps Script > Project Settings > Script Properties
+ * TELEGRAM_BOT_TOKEN = your_bot_token
+ * TELEGRAM_CHAT_ID = your_chat_id_or_channel
  */
 
 const CONFIG = {
@@ -20,7 +25,7 @@ const CONFIG = {
   SPREADSHEET_ID: "",
   SPREADSHEET_NAME: "سقيا ماء - عمليات الدفع",
   SHEET_NAME: "edfaly pyment",
-  BANK_TRANSFER_SHEET_NAME: "bank transfer",
+  BANK_TRANSFER_SHEET_NAME: "BankTransfers",
 
   BANK_ENDPOINT: "http://62.240.55.2:6187/BCDUssd/NewEdfali.asmx",
 
@@ -46,8 +51,31 @@ const ERROR_MESSAGES = {
   INVALID: "بيانات غير صحيحة",
 };
 
+const BANK_TRANSFER_HEADERS = [
+  "Timestamp",
+  "Transaction ID",
+  "Donor Name",
+  "Phone",
+  "WhatsApp",
+  "Amount",
+  "Quantity",
+  "Unit Price",
+  "Mosque",
+  "Mosque Address",
+  "Mosque Location",
+  "Distribution Type",
+  "Payment Method",
+  "Status",
+  "Receipt Source",
+  "WhatsApp Message",
+  "WhatsApp Link",
+  "Admin Notes",
+  "Confirmed At",
+  "Telegram Sent",
+];
+
 function doGet(e) {
-  const callback = getParam(e, "callback", "callback");
+  const callback = getParam(e, "callback", "");
 
   try {
     const action = getParam(e, "action", "").trim();
@@ -61,69 +89,81 @@ function doGet(e) {
       result = handleTestTelegram();
     } else if (action === "telegramStatus") {
       result = handleTelegramStatus();
+    } else if (action === "createBankTransferRequest") {
+      result = handleCreateBankTransferRequest(e);
     } else if (action === "saveBankTransfer") {
-      result = handleSaveBankTransfer(e);
+      result = handleCreateBankTransferRequest(e);
     } else if (action === "health") {
       result = { success: true, message: "Saniah payment API is running" };
     } else {
       result = { success: false, message: "invalid action" };
     }
 
-    return jsonp(callback, result);
+    return outputResponse(callback, result);
   } catch (err) {
-    return jsonp(callback, { success: false, message: err.message || String(err) });
+    return outputResponse(callback, { success: false, message: err.message || String(err) });
   }
 }
 
-function handleSaveBankTransfer(e) {
+function handleCreateBankTransferRequest(e) {
   const data = {
-    date: new Date(),
+    timestamp: new Date(),
     transactionId: getParam(e, "transactionId"),
     donorName: getParam(e, "donorName"),
-    donorPhone: getParam(e, "donorPhone"),
+    phone: getParam(e, "phone") || getParam(e, "donorPhone"),
+    whatsapp: getParam(e, "whatsapp") || getParam(e, "donorPhone"),
     amount: normalizeAmount(getParam(e, "amount")),
     quantity: getParam(e, "quantity"),
+    unitPrice: getParam(e, "unitPrice"),
     mosque: getParam(e, "mosque"),
-    receiptUrl: getParam(e, "receiptUrl"),
-    status: getParam(e, "status", "pending_review"),
-    notes: getParam(e, "notes"),
+    mosqueAddress: getParam(e, "mosqueAddress"),
+    mosqueLocation: getParam(e, "mosqueLocation"),
+    distributionType: getParam(e, "distributionType"),
+    paymentMethod: getParam(e, "paymentMethod", "حوالة مصرفية"),
+    status: "بانتظار صورة الحوالة",
+    receiptSource: getParam(e, "receiptSource", "WhatsApp"),
+    whatsappMessage: getParam(e, "whatsappMessage"),
+    whatsappLink: getParam(e, "whatsappLink"),
   };
 
-  if (!data.donorName || !data.donorPhone || !data.amount || !data.receiptUrl) {
+  if (!data.transactionId || !data.donorName || !(data.phone || data.whatsapp) || !data.amount || !data.quantity || !data.paymentMethod) {
     return {
       success: false,
-      message: "missing bank transfer fields",
+      message: "missing bank transfer request fields",
       data,
     };
   }
 
   try {
-    getBankTransferSheet().appendRow([
-      data.date,
-      data.transactionId,
-      data.donorName,
-      data.donorPhone,
-      data.amount,
-      data.quantity,
-      data.mosque,
-      data.receiptUrl,
-      data.status,
-      data.notes,
-    ]);
+    const sheet = getBankTransferSheet();
+    const duplicateRow = findRowByTransactionId(sheet, data.transactionId);
 
-    notifyTelegramBankTransfer(data);
+    if (duplicateRow > 0) {
+      return {
+        success: true,
+        duplicate: true,
+        transactionId: data.transactionId,
+        status: data.status,
+        message: "طلب الحوالة مسجل مسبقاً",
+      };
+    }
+
+    appendBankTransferRow(sheet, data);
 
     return {
       success: true,
-      message: "bank transfer saved",
+      duplicate: false,
+      transactionId: data.transactionId,
+      status: data.status,
+      message: "تم تسجيل طلب الحوالة المصرفية",
       sheetName: CONFIG.BANK_TRANSFER_SHEET_NAME,
-      data,
     };
   } catch (err) {
-    Logger.log(`handleSaveBankTransfer error: ${err.message}`);
+    Logger.log(`handleCreateBankTransferRequest error: ${err.message}`);
+    logBackendError("createBankTransferRequest", err.message || String(err));
     return {
       success: false,
-      message: err.message || String(err),
+      message: "تعذر تسجيل طلب الحوالة المصرفية",
       sheetName: CONFIG.BANK_TRANSFER_SHEET_NAME,
     };
   }
@@ -402,26 +442,91 @@ function getSheet() {
 }
 
 function getBankTransferSheet() {
+  return getOrCreateSheet(CONFIG.BANK_TRANSFER_SHEET_NAME, BANK_TRANSFER_HEADERS);
+}
+
+function getOrCreateSheet(sheetName, headers) {
   const ss = getSpreadsheet();
-  let sheet = ss.getSheetByName(CONFIG.BANK_TRANSFER_SHEET_NAME);
+  let sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
-    sheet = ss.insertSheet(CONFIG.BANK_TRANSFER_SHEET_NAME);
-    sheet.appendRow([
-      "date",
-      "transactionId",
-      "donorName",
-      "donorPhone",
-      "amount",
-      "quantity",
-      "mosque",
-      "receiptUrl",
-      "status",
-      "notes",
-    ]);
+    sheet = ss.insertSheet(sheetName);
   }
 
+  ensureHeaders(sheet, headers);
   return sheet;
+}
+
+function ensureHeaders(sheet, headers) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    return;
+  }
+
+  const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getValues()[0];
+  const missingHeaders = headers.filter((header) => currentHeaders.indexOf(header) === -1);
+
+  if (missingHeaders.length > 0) {
+    sheet.getRange(1, currentHeaders.length + 1, 1, missingHeaders.length).setValues([missingHeaders]);
+  }
+}
+
+function getHeaderMap(sheet) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const map = {};
+  headers.forEach((header, index) => {
+    if (header) map[String(header).trim()] = index + 1;
+  });
+  return map;
+}
+
+function findRowByTransactionId(sheet, transactionId) {
+  const headerMap = getHeaderMap(sheet);
+  const column = headerMap["Transaction ID"];
+
+  if (!column || sheet.getLastRow() < 2) return -1;
+
+  const values = sheet.getRange(2, column, sheet.getLastRow() - 1, 1).getValues();
+  const wanted = String(transactionId || "").trim();
+
+  for (let i = 0; i < values.length; i += 1) {
+    if (String(values[i][0] || "").trim() === wanted) {
+      return i + 2;
+    }
+  }
+
+  return -1;
+}
+
+function appendBankTransferRow(sheet, data) {
+  const headerMap = getHeaderMap(sheet);
+  const row = new Array(sheet.getLastColumn()).fill("");
+
+  setRowValue(row, headerMap, "Timestamp", data.timestamp);
+  setRowValue(row, headerMap, "Transaction ID", data.transactionId);
+  setRowValue(row, headerMap, "Donor Name", data.donorName);
+  setRowValue(row, headerMap, "Phone", data.phone);
+  setRowValue(row, headerMap, "WhatsApp", data.whatsapp);
+  setRowValue(row, headerMap, "Amount", data.amount);
+  setRowValue(row, headerMap, "Quantity", data.quantity);
+  setRowValue(row, headerMap, "Unit Price", data.unitPrice);
+  setRowValue(row, headerMap, "Mosque", data.mosque);
+  setRowValue(row, headerMap, "Mosque Address", data.mosqueAddress);
+  setRowValue(row, headerMap, "Mosque Location", data.mosqueLocation);
+  setRowValue(row, headerMap, "Distribution Type", data.distributionType);
+  setRowValue(row, headerMap, "Payment Method", data.paymentMethod);
+  setRowValue(row, headerMap, "Status", data.status);
+  setRowValue(row, headerMap, "Receipt Source", data.receiptSource);
+  setRowValue(row, headerMap, "WhatsApp Message", data.whatsappMessage);
+  setRowValue(row, headerMap, "WhatsApp Link", data.whatsappLink);
+  setRowValue(row, headerMap, "Telegram Sent", "NO");
+
+  sheet.appendRow(row);
+}
+
+function setRowValue(row, headerMap, header, value) {
+  const column = headerMap[header];
+  if (column) row[column - 1] = value || "";
 }
 
 function logTransaction(entry) {
@@ -540,20 +645,83 @@ function notifyTelegramPaymentSuccess(entry) {
   }
 }
 
-function notifyTelegramBankTransfer(data) {
+function handleBankTransferStatusEdit(e) {
+  try {
+    if (!e || !e.range) return;
+
+    const sheet = e.range.getSheet();
+    if (sheet.getName() !== CONFIG.BANK_TRANSFER_SHEET_NAME) return;
+
+    const headerMap = getHeaderMap(sheet);
+    const statusColumn = headerMap["Status"];
+    const telegramSentColumn = headerMap["Telegram Sent"];
+    const confirmedAtColumn = headerMap["Confirmed At"];
+    const adminNotesColumn = headerMap["Admin Notes"];
+
+    if (!statusColumn || !telegramSentColumn || e.range.getColumn() !== statusColumn || e.range.getRow() < 2) return;
+
+    const newStatus = String(e.value || e.range.getValue() || "").trim();
+    if (newStatus !== "تم الدفع") return;
+
+    const row = e.range.getRow();
+    const telegramSent = String(sheet.getRange(row, telegramSentColumn).getValue() || "").trim();
+    if (telegramSent === "YES") return;
+
+    const data = getBankTransferRowData(sheet, row, headerMap);
+    const sent = notifyTelegramBankTransferPaid(data);
+
+    if (sent.success) {
+      if (confirmedAtColumn) sheet.getRange(row, confirmedAtColumn).setValue(new Date());
+      sheet.getRange(row, telegramSentColumn).setValue("YES");
+    } else {
+      const message = `Telegram failed: ${sent.message || "unknown error"}`;
+      if (adminNotesColumn) sheet.getRange(row, adminNotesColumn).setValue(message);
+      logBackendError("handleBankTransferStatusEdit", message);
+    }
+  } catch (err) {
+    Logger.log(`handleBankTransferStatusEdit error: ${err.message}`);
+    logBackendError("handleBankTransferStatusEdit", err.message || String(err));
+  }
+}
+
+// Installable trigger recommended:
+// 1. Open Apps Script.
+// 2. Go to Triggers.
+// 3. Add Trigger.
+// 4. Choose function: handleBankTransferStatusEdit
+// 5. Event source: From spreadsheet
+// 6. Event type: On edit
+// 7. Authorize the script.
+function onEdit(e) {
+  handleBankTransferStatusEdit(e);
+}
+
+function getBankTransferRowData(sheet, row, headerMap) {
+  const values = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const data = {};
+
+  Object.keys(headerMap).forEach((header) => {
+    data[header] = values[headerMap[header] - 1];
+  });
+
+  return data;
+}
+
+function notifyTelegramBankTransferPaid(data) {
   try {
     const lines = [
-      "طلب تحويل مصرفي جديد",
+      "✅ تم تأكيد دفع جديد",
       "",
-      `رقم العملية: ${data.transactionId || "-"}`,
-      `المتبرع: ${data.donorName || "-"}`,
-      `رقم الهاتف: ${data.donorPhone || "-"}`,
-      `المبلغ: ${data.amount || "-"} دينار`,
-      `عدد الكراتين: ${data.quantity || "-"}`,
-      `المسجد: ${data.mosque || "-"}`,
-      `الحالة: ${data.status || "pending_review"}`,
-      "",
-      `رابط الإيصال: ${data.receiptUrl || "-"}`,
+      `رقم العملية: ${data["Transaction ID"] || "-"}`,
+      `الاسم: ${data["Donor Name"] || "-"}`,
+      `المبلغ: ${data["Amount"] || "-"} دينار`,
+      `عدد الكراتين: ${data["Quantity"] || "-"}`,
+      `سعر الكرتونة: ${data["Unit Price"] || "-"} دينار`,
+      `المسجد/التوزيع: ${data["Mosque"] || "-"}`,
+      `العنوان: ${data["Mosque Address"] || "-"}`,
+      `رقم الواتساب: ${data["WhatsApp"] || data["Phone"] || "-"}`,
+      "طريقة الدفع: حوالة مصرفية",
+      "الحالة: تم الدفع",
     ];
 
     const sent = sendTelegramMessage(lines.join("\n"));
@@ -564,7 +732,7 @@ function notifyTelegramBankTransfer(data) {
 
     return sent;
   } catch (err) {
-    Logger.log(`notifyTelegramBankTransfer error: ${err.message}`);
+    Logger.log(`notifyTelegramBankTransferPaid error: ${err.message}`);
     return {
       success: false,
       message: err.message || String(err),
@@ -576,10 +744,7 @@ function sendTelegramMessage(text) {
   const telegram = getTelegramConfig();
 
   if (!telegram.botToken || !telegram.chatId) {
-    return {
-      success: false,
-      message: "missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in Script Properties",
-    };
+    throw new Error("Missing Telegram script properties");
   }
 
   try {
@@ -619,12 +784,23 @@ function sendTelegramMessage(text) {
 }
 
 function getTelegramConfig() {
-  const props = PropertiesService.getScriptProperties();
-
   return {
-    botToken: props.getProperty("TELEGRAM_BOT_TOKEN") || CONFIG.TELEGRAM_BOT_TOKEN,
-    chatId: props.getProperty("TELEGRAM_CHAT_ID") || CONFIG.TELEGRAM_CHAT_ID,
+    botToken: getScriptProperty("TELEGRAM_BOT_TOKEN") || CONFIG.TELEGRAM_BOT_TOKEN,
+    chatId: getScriptProperty("TELEGRAM_CHAT_ID") || CONFIG.TELEGRAM_CHAT_ID,
   };
+}
+
+function getScriptProperty(name) {
+  return PropertiesService.getScriptProperties().getProperty(name);
+}
+
+function logBackendError(source, message) {
+  try {
+    const sheet = getOrCreateSheet("Logs", ["Timestamp", "Source", "Message"]);
+    sheet.appendRow([new Date(), source, message]);
+  } catch (err) {
+    Logger.log(`logBackendError failed: ${err.message}`);
+  }
 }
 
 function getMeta(e) {
@@ -652,6 +828,14 @@ function jsonp(callback, obj) {
   return ContentService
     .createTextOutput(`${callback}(${JSON.stringify(obj)})`)
     .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function outputResponse(callback, obj) {
+  if (callback) return jsonp(callback, obj);
+
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function normalizeAmount(value) {
