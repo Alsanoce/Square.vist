@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import MosqueLocationPicker from "../components/MosqueLocationPicker";
 import { DONATION_PACKAGES, createTransactionId, getDonationPackage } from "../lib/donationPricing";
 
 function convertToEnglishDigits(input) {
@@ -211,6 +212,13 @@ export default function Donate() {
 
               <div className="form-group">
                 <label>موقع المسجد على خرائط Google</label>
+                <MosqueLocationPicker
+                  confirmedLocation={mosqueLocation}
+                  onConfirm={(location) => setMosqueLocation(location.url)}
+                  onError={setError}
+                />
+
+                <p style={s.legacyLocationTitle}>خيارات احتياطية</p>
                 <div style={s.locationActions}>
                   <button type="button" onClick={useCurrentLocation} disabled={isLocating} style={s.locationButton}>
                     {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
@@ -219,11 +227,6 @@ export default function Donate() {
                     افتح خرائط Google
                   </button>
                 </div>
-                {mosqueLocation && (
-                  <a href={mosqueLocation} target="_blank" rel="noreferrer" style={s.locationLink}>
-                    تم تحديد الموقع - عرض على الخريطة
-                  </a>
-                )}
                 <p style={s.fieldHint}>عند الضغط على استخدام موقعي الحالي سيطلب المتصفح السماح بتحديد الموقع.</p>
               </div>
             </>
@@ -297,6 +300,12 @@ const s = {
     lineHeight: 1.7,
     marginTop: "0.85rem",
     padding: "0.75rem 0.9rem",
+  },
+  legacyLocationTitle: {
+    color: "var(--text-muted)",
+    fontSize: "0.78rem",
+    fontWeight: 800,
+    margin: "1rem 0 0.55rem",
   },
   locationActions: {
     display: "grid",
