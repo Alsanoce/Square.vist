@@ -93,6 +93,8 @@ function doGet(e) {
       result = handleCreateBankTransferRequest(e);
     } else if (action === "saveBankTransfer") {
       result = handleCreateBankTransferRequest(e);
+    } else if (action === "getPublicStats") {
+      result = handleGetPublicStats();
     } else if (action === "health") {
       result = { success: true, message: "Saniah payment API is running" };
     } else {
@@ -103,6 +105,124 @@ function doGet(e) {
   } catch (err) {
     return outputResponse(callback, { success: false, message: err.message || String(err) });
   }
+}
+
+function handleGetPublicStats() {
+  try {
+    const acc = {
+      cartonsDistributed: 0,
+      mosques: {},
+      donors: {},
+      unitPrices: [],
+    };
+
+    collectStatsFromEdfaalySheet(acc);
+    collectStatsFromBankTransferSheet(acc);
+
+    const cartonPrice = acc.unitPrices.length
+      ? Math.min.apply(null, acc.unitPrices)
+      : 6;
+
+    return {
+      success: true,
+      stats: {
+        cartonsDistributed: acc.cartonsDistributed,
+        mosquesServed: Object.keys(acc.mosques).length,
+        donorsCount: Object.keys(acc.donors).length,
+        cartonPrice,
+      },
+    };
+  } catch (err) {
+    Logger.log(`handleGetPublicStats error: ${err.message}`);
+    return {
+      success: false,
+      message: err.message || String(err),
+    };
+  }
+}
+
+function collectStatsFromEdfaalySheet(acc) {
+  const sheet = getSheet();
+  if (sheet.getLastRow() < 2) return;
+
+  const headerMap = getHeaderMap(sheet);
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+
+  values.forEach((row) => {
+    const status = getRowValue(row, headerMap, "status");
+    const resultCode = getRowValue(row, headerMap, "resultCode");
+
+    if (!isConfirmedStatus(status) && String(resultCode || "").trim().toUpperCase() !== "OK") return;
+
+    addStatsEntry(acc, {
+      quantity: getRowValue(row, headerMap, "quantity"),
+      unitPrice: getRowValue(row, headerMap, "unitPrice"),
+      donor: getRowValue(row, headerMap, "donorName") || getRowValue(row, headerMap, "donorPhone"),
+      mosque: getRowValue(row, headerMap, "mosque"),
+    });
+  });
+}
+
+function collectStatsFromBankTransferSheet(acc) {
+  const sheet = getBankTransferSheet();
+  if (sheet.getLastRow() < 2) return;
+
+  const headerMap = getHeaderMap(sheet);
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+
+  values.forEach((row) => {
+    const status = getRowValue(row, headerMap, "Status");
+    if (!isConfirmedStatus(status)) return;
+
+    addStatsEntry(acc, {
+      quantity: getRowValue(row, headerMap, "Quantity"),
+      unitPrice: getRowValue(row, headerMap, "Unit Price"),
+      donor: getRowValue(row, headerMap, "Donor Name") || getRowValue(row, headerMap, "Phone") || getRowValue(row, headerMap, "WhatsApp"),
+      mosque: getRowValue(row, headerMap, "Mosque"),
+    });
+  });
+}
+
+function addStatsEntry(acc, entry) {
+  const quantity = toNumber(entry.quantity);
+  const unitPrice = toNumber(entry.unitPrice);
+  const donor = normalizeStatsKey(entry.donor);
+  const mosque = normalizeStatsKey(entry.mosque);
+
+  if (quantity > 0) acc.cartonsDistributed += quantity;
+  if (unitPrice > 0) acc.unitPrices.push(unitPrice);
+  if (donor) acc.donors[donor] = true;
+  if (mosque) acc.mosques[mosque] = true;
+}
+
+function getRowValue(row, headerMap, header) {
+  const column = headerMap[header];
+  return column ? row[column - 1] : "";
+}
+
+function isConfirmedStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  return [
+    "confirmed",
+    "paid",
+    "ok",
+    "تم الدفع",
+    "مؤكد",
+    "تم التأكيد",
+  ].indexOf(status) !== -1;
+}
+
+function normalizeStatsKey(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function toNumber(value) {
+  const normalized = String(value || "")
+    .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+    .replace(",", ".")
+    .replace(/[^\d.]/g, "");
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num : 0;
 }
 
 function handleCreateBankTransferRequest(e) {

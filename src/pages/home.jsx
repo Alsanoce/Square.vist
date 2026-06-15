@@ -1,12 +1,25 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { callEdfaaly } from "../lib/edfaalyApi";
 
 /* ── إحصائيات ── */
+const FALLBACK_STATS = {
+  cartonsDistributed: 1240,
+  mosquesServed: 38,
+  donorsCount: 320,
+  cartonPrice: 6,
+};
+
 const STATS = [
-  { id: "s1", target: 1240, label: "كرتونة موزعة" },
-  { id: "s2", target: 38,   label: "مسجد مستفيد"  },
-  { id: "s3", target: 320,  label: "متبرع كريم"   },
+  { id: "s1", key: "cartonsDistributed", label: "كرتونة موزعة" },
+  { id: "s2", key: "mosquesServed", label: "مسجد مستفيد" },
+  { id: "s3", key: "donorsCount", label: "متبرع كريم" },
 ];
+
+function numberOrFallback(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
 
 const STEPS = [
   { icon: "🛒", num: "١", title: "اختر الكمية",      desc: "حدد عدد كراتين الماء التي تريد التبرع بها — كل كرتونة بـ 6 دينار فقط" },
@@ -53,6 +66,31 @@ function StatItem({ target, label }) {
 }
 
 export default function Home() {
+  const [stats, setStats] = useState(FALLBACK_STATS);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    callEdfaaly("getPublicStats")
+      .then((response) => {
+        if (cancelled || !response?.success || !response.stats) return;
+
+        setStats({
+          cartonsDistributed: numberOrFallback(response.stats.cartonsDistributed, FALLBACK_STATS.cartonsDistributed),
+          mosquesServed: numberOrFallback(response.stats.mosquesServed, FALLBACK_STATS.mosquesServed),
+          donorsCount: numberOrFallback(response.stats.donorsCount, FALLBACK_STATS.donorsCount),
+          cartonPrice: numberOrFallback(response.stats.cartonPrice, FALLBACK_STATS.cartonPrice),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setStats(FALLBACK_STATS);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="page-wrapper" style={{ paddingTop: 0 }}>
 
@@ -119,9 +157,15 @@ export default function Home() {
 
       {/* ══════════ STATS ══════════ */}
       <div style={s.statsBar}>
-        {STATS.map((st) => <StatItem key={st.id} target={st.target} label={st.label} />)}
+        {STATS.map((st) => (
+          <StatItem
+            key={st.id}
+            target={stats[st.key] ?? FALLBACK_STATS[st.key]}
+            label={st.label}
+          />
+        ))}
         <div style={s.statItem}>
-          <span style={s.statNum}>6</span>
+          <span style={s.statNum}>{Number(stats.cartonPrice || FALLBACK_STATS.cartonPrice).toLocaleString("ar-EG")}</span>
           <span style={s.statLabel}>دينار / الكرتونة</span>
         </div>
       </div>
