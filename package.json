@@ -8,6 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@netlify/blobs": "latest",
+    "@netlify/functions": "latest",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
     "firebase": "^10.7.2",
