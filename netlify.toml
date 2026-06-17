@@ -5,7 +5,3 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-
-[[edge_functions]]
-  path = "/*"
-  function = "count-traffic"

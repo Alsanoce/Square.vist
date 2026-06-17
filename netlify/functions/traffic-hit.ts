@@ -1,5 +1,5 @@
 import { getStore } from "@netlify/blobs";
-import type { Config, Context } from "@netlify/edge-functions";
+import type { Config } from "@netlify/functions";
 
 declare const Netlify:
   | {
@@ -15,63 +15,15 @@ type TrafficBucket = {
   updatedAt: string;
 };
 
-const IGNORED_PATH_PREFIXES = ["/.netlify/", "/favicon.ico", "/robots.txt"];
-const IGNORED_EXTENSIONS = [
-  ".css",
-  ".js",
-  ".mjs",
-  ".map",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".svg",
-  ".webp",
-  ".ico",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".eot"
-];
-
-export default async (req: Request, context: Context) => {
-  const url = new URL(req.url);
-  const response = await context.next();
-
-  if (shouldCount(req, url, response)) {
-    await incrementTrafficBucket(url.hostname);
+export default async (req: Request) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
   }
 
-  return response;
-};
-
-export const config: Config = {
-  path: "/*"
-};
-
-function shouldCount(req: Request, url: URL, response: Response) {
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    return false;
-  }
-
-  if (response.status >= 400) {
-    return false;
-  }
-
-  if (IGNORED_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
-    return false;
-  }
-
-  return !IGNORED_EXTENSIONS.some((extension) =>
-    url.pathname.toLowerCase().endsWith(extension)
-  );
-}
-
-async function incrementTrafficBucket(hostname: string) {
-  const domain = readEnv("MONITOR_DOMAIN", hostname);
+  const domain = readEnv("MONITOR_DOMAIN", new URL(req.url).hostname);
   const windowStart = startOfHour(new Date());
-  const key = bucketKey(domain, windowStart);
   const store = getStore({ name: "traffic-alerts", consistency: "strong" });
+  const key = bucketKey(domain, windowStart);
   const current = await store.get(key, { type: "json" });
   const bucket = isTrafficBucket(current)
     ? current
@@ -85,7 +37,14 @@ async function incrementTrafficBucket(hostname: string) {
   bucket.updatedAt = new Date().toISOString();
 
   await store.setJSON(key, bucket);
-}
+
+  return new Response(null, { status: 204 });
+};
+
+export const config: Config = {
+  path: "/api/traffic-hit",
+  method: ["POST"]
+};
 
 function bucketKey(domain: string, windowStart: Date) {
   return `traffic/${slug(domain)}/${windowStart.toISOString().slice(0, 13)}.json`;

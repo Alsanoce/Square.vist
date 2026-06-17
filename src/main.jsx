@@ -4,10 +4,15 @@ import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
+  
   <BrowserRouter>
     <App />
   </BrowserRouter>
 );
+fetch("/api/traffic-hit", {
+  method: "POST",
+  keepalive: true
+}).catch(() => {});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
