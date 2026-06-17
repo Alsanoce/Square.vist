@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MosqueLocationPicker from "../components/MosqueLocationPicker";
-import { DONATION_PACKAGES, createTransactionId, getDonationPackage } from "../lib/donationPricing";
+import { CARTON_PRICE, DONATION_PACKAGES, createTransactionId, getDonationPackage } from "../lib/donationPricing";
 
 function convertToEnglishDigits(input) {
   return input.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
@@ -20,7 +20,7 @@ export default function Donate() {
 
   const selectedPackage = getDonationPackage(quantity);
   const total = selectedPackage.total;
-  const unitPrice = total / selectedPackage.quantity;
+  const unitPrice = CARTON_PRICE;
   const canSelectMosque = selectedPackage.quantity >= 10;
   const distributionType = canSelectMosque ? "selected_mosque" : "nearest_mosque";
 
@@ -132,7 +132,7 @@ export default function Donate() {
               <span style={s.priceCurrency}>دينار </span>
               {DONATION_PACKAGES[0].total}
             </div>
-            <p style={s.packageHint}>اختر عدد الكراتين، وكلما زاد العدد صار سعر الكرتونة أقل.</p>
+            <p style={s.packageHint}>اختر عدد الكراتين أو اكتب العدد بنفسك. سعر الكرتونة ثابت 7 دينار.</p>
           </div>
 
           <div className="form-group">
@@ -179,6 +179,21 @@ export default function Donate() {
                   </button>
                 );
               })}
+            </div>
+            <div style={s.customQuantityBox}>
+              <label style={s.customQuantityLabel}>أو اكتب عدد الكراتين</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={selectedPackage.quantity}
+                onChange={(e) => {
+                  const nextQuantity = convertToEnglishDigits(e.target.value).replace(/\D/g, "");
+                  setQuantity(nextQuantity || 1);
+                }}
+                style={s.customQuantityInput}
+              />
             </div>
             <div style={s.distributionNote}>
               {canSelectMosque
@@ -348,6 +363,29 @@ const s = {
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
     gap: "0.75rem",
+  },
+  customQuantityBox: {
+    display: "grid",
+    gap: "0.45rem",
+    marginTop: "0.85rem",
+  },
+  customQuantityLabel: {
+    color: "var(--text-muted)",
+    fontSize: "0.82rem",
+    fontWeight: 700,
+  },
+  customQuantityInput: {
+    width: "100%",
+    minHeight: 48,
+    border: "1px solid rgba(0,212,255,0.24)",
+    borderRadius: 12,
+    background: "rgba(255,255,255,0.05)",
+    color: "var(--white)",
+    fontFamily: "'Tajawal', sans-serif",
+    fontSize: "1rem",
+    fontWeight: 700,
+    padding: "0.75rem 0.9rem",
+    textAlign: "center",
   },
   packageButton: {
     minHeight: 104,

@@ -1,13 +1,22 @@
-export const DONATION_PACKAGES = [
-  { quantity: 4, total: 28 },
-  { quantity: 5, total: 35 },
-  { quantity: 10, total: 70 },
-  { quantity: 20, total: 140 },
-  { quantity: 40, total: 280 },
-];
+export const CARTON_PRICE = 7;
+export const MIN_DONATION_QUANTITY = 1;
+export const DONATION_PACKAGE_QUANTITIES = [4, 5, 10, 20, 40];
+
+export const DONATION_PACKAGES = DONATION_PACKAGE_QUANTITIES.map((quantity) => ({
+  quantity,
+  total: quantity * CARTON_PRICE,
+}));
 
 export function getDonationPackage(quantity) {
-  return DONATION_PACKAGES.find((item) => item.quantity === Number(quantity)) || DONATION_PACKAGES[0];
+  const parsed = Number(quantity);
+  const safeQuantity = Number.isFinite(parsed)
+    ? Math.max(MIN_DONATION_QUANTITY, Math.floor(parsed))
+    : DONATION_PACKAGES[0].quantity;
+
+  return {
+    quantity: safeQuantity,
+    total: safeQuantity * CARTON_PRICE,
+  };
 }
 
 export function createTransactionId() {
