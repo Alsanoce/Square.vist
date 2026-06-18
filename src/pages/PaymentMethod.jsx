@@ -3,9 +3,11 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { callEdfaaly } from "../lib/edfaalyApi";
+import { callYussor } from "../lib/yussorApi";
 
 const METHOD_CONFIG = {
   edfaaly: {
+    provider: "edfaaly",
     title: "أدفع لي",
     icon: "/payment-icons/adfa3ly.png",
     fieldLabel: "رقم هاتف أدفع لي",
@@ -16,7 +18,20 @@ const METHOD_CONFIG = {
     error: "رقم هاتف أدفع لي يجب أن يكون 9 أرقام ويبدأ بـ 9، بدون +218",
     toCustomer: (value) => `+218${value}`,
   },
+  yussor: {
+    provider: "yussor",
+    title: "يسر باي",
+    icon: "/payment-icons/yussor-pay.jpg",
+    fieldLabel: "رقم بطاقة يسر باي",
+    placeholder: "اكتب رقم البطاقة",
+    help: "اكتب رقم بطاقة يسر باي كما هو ظاهر لديك، ثم سيتم إرسال كود OTP.",
+    paymentMethod: "يسر باي",
+    validate: (value) => value.length === 9 || value.length === 10,
+    error: "رقم بطاقة يسر باي يجب أن يكون 9 أو 10 أرقام",
+    toCustomer: (value) => value,
+  },
   mobicash: {
+    provider: "manual",
     title: "موبي كاش",
     icon: "/payment-icons/mobicash.png",
     fieldLabel: "رقم بطاقة موبي كاش",
@@ -86,8 +101,9 @@ export default function PaymentMethod() {
       return;
     }
 
-    const response = await callEdfaaly("doPTrans", {
+    const payload = {
       customerMobile: customer,
+      identityCard: normalized,
       amount: payableAmount,
       decimalAmount: payableAmount,
       originalAmount: payableAmount,
@@ -102,9 +118,15 @@ export default function PaymentMethod() {
       mosque: state.mosque,
       mosqueAddress: state.mosqueAddress || "",
       mosqueLocation: state.mosqueLocation || "",
-      cardNumber: method === "mobicash" ? normalized : "",
+      cardNumber: normalized,
       mobiCard: method === "mobicash" ? normalized : "",
-    });
+      onlineOperation: 1,
+    };
+
+    const response =
+      config.provider === "yussor"
+        ? await callYussor("openSession", payload)
+        : await callEdfaaly("doPTrans", payload);
 
     if (!response.success) {
       throw new Error(response.message || "تعذر بدء الدفع");
@@ -116,7 +138,8 @@ export default function PaymentMethod() {
         amount: payableAmount,
         paymentPhone: customer,
         paymentNumber: normalized,
-        sessionID: response.sessionID,
+        sessionID: response.sessionID || state.transactionId,
+        paymentProvider: config.provider,
         paymentMethod: config.paymentMethod,
       },
     });

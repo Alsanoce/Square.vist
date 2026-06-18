@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import OtpInput from "react-otp-input";
 import { callEdfaaly } from "../lib/edfaalyApi";
+import { callYussor } from "../lib/yussorApi";
 
 export default function OtpConfirmationPage() {
   const [otp, setOtp] = useState("");
@@ -13,6 +14,7 @@ export default function OtpConfirmationPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const payableAmount = Number(state?.amount || 0);
+  const isYussorPay = state?.paymentProvider === "yussor";
 
   useEffect(() => {
     if (!state?.sessionID) navigate("/donate");
@@ -57,6 +59,37 @@ export default function OtpConfirmationPage() {
     });
   };
 
+  const confirmYussorPay = () =>
+    callYussor("completeSession", {
+      otp,
+      sessionID: state.sessionID,
+      transactionId: state.transactionId || state.sessionID,
+      paymentNumber: state.paymentNumber || "",
+      paymentMethod: state.paymentMethod || "يسر باي",
+      amount: payableAmount,
+    });
+
+  const confirmEdfaaly = () =>
+    callEdfaaly("onlineConfTrans", {
+      otp,
+      sessionID: state.sessionID,
+      customerMobile: state.paymentPhone || state.phone,
+      paymentMethod: state.paymentMethod || "أدفع لي",
+      amount: payableAmount,
+      decimalAmount: payableAmount,
+      originalAmount: payableAmount,
+      totalAmount: payableAmount,
+      unitPrice: state.unitPrice || "",
+      quantity: state.quantity || "",
+      transactionId: state.transactionId || "",
+      donorName: state.donorName || "",
+      donorPhone: state.phone || "",
+      mosque: state.mosque || "",
+      mosqueAddress: state.mosqueAddress || "",
+      mosqueLocation: state.mosqueLocation || "",
+      meterNumber: state.mosque,
+    });
+
   const handleConfirm = async () => {
     if (isLoading) return;
 
@@ -69,25 +102,7 @@ export default function OtpConfirmationPage() {
     setStatus(null);
 
     try {
-      const confirmRes = await callEdfaaly("onlineConfTrans", {
-        otp,
-        sessionID: state.sessionID,
-        customerMobile: state.paymentPhone || state.phone,
-        paymentMethod: state.paymentMethod || "أدفع لي",
-        amount: payableAmount,
-        decimalAmount: payableAmount,
-        originalAmount: payableAmount,
-        totalAmount: payableAmount,
-        unitPrice: state.unitPrice || "",
-        quantity: state.quantity || "",
-        transactionId: state.transactionId || "",
-        donorName: state.donorName || "",
-        donorPhone: state.phone || "",
-        mosque: state.mosque || "",
-        mosqueAddress: state.mosqueAddress || "",
-        mosqueLocation: state.mosqueLocation || "",
-        meterNumber: state.mosque,
-      });
+      const confirmRes = isYussorPay ? await confirmYussorPay() : await confirmEdfaaly();
 
       if (isBankConfirmationOk(confirmRes)) {
         setStatus({ type: "success", msg: "تمت العملية بنجاح" });
@@ -121,7 +136,9 @@ export default function OtpConfirmationPage() {
 
         <div className="card" style={s.card}>
           <div style={s.infoBox}>
-            <p style={s.infoText}>تم إرسال كود التحقق إلى الرقم:</p>
+            <p style={s.infoText}>
+              تم إرسال كود التحقق إلى {isYussorPay ? "البطاقة" : "الرقم"}:
+            </p>
             <p style={s.phoneDisplay}>{state?.paymentPhone || state?.phone}</p>
           </div>
 
