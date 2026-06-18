@@ -10,6 +10,13 @@ const METHODS = [
     path: "/payment/edfaaly",
   },
   {
+    id: "yussor",
+    title: "يسر باي",
+    description: "أدخل رقم البطاقة وسيتم إرسال كود OTP لإتمام الدفع.",
+    icon: "/payment-icons/yussor-pay.jpg",
+    path: "/payment/yussor",
+  },
+  {
     id: "mobicash",
     title: "موبي كاش",
     description: "أدخل رقم البطاقة وسنتواصل معك لإتمام الدفع.",
@@ -67,11 +74,7 @@ export default function Payment() {
                 onClick={() => goToMethod(method)}
                 style={s.methodButton}
               >
-                {method.icon ? (
-                  <img src={method.icon} alt="" style={s.methodIcon} />
-                ) : (
-                  <span style={s.bankIcon}>ح</span>
-                )}
+                <img src={method.icon} alt="" style={s.methodIcon} />
                 <span style={s.methodText}>
                   <strong>{method.title}</strong>
                   <span>{method.description}</span>
@@ -140,21 +143,6 @@ const s = {
     borderRadius: 10,
     background: "rgba(255,255,255,0.92)",
     padding: "0.35rem",
-    flexShrink: 0,
-  },
-  bankIcon: {
-    width: 56,
-    height: 56,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    background: "rgba(0,212,255,0.1)",
-    border: "1px solid rgba(0,212,255,0.24)",
-    color: "var(--cyan)",
-    fontFamily: "'Cairo', sans-serif",
-    fontSize: "1.4rem",
-    fontWeight: 900,
     flexShrink: 0,
   },
   methodText: {
