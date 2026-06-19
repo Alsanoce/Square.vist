@@ -72,10 +72,11 @@ export default function Payment() {
                 key={method.id}
                 type="button"
                 onClick={() => goToMethod(method)}
+                className="payment-method-button"
                 style={s.methodButton}
               >
                 <img src={method.icon} alt="" style={s.methodIcon} />
-                <span style={s.methodText}>
+                <span className="payment-method-copy" style={s.methodText}>
                   <strong>{method.title}</strong>
                   <span>{method.description}</span>
                 </span>

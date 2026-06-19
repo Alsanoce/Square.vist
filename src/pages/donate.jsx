@@ -159,7 +159,7 @@ export default function Donate() {
 
           <div className="form-group">
             <label>عدد كراتين الماء</label>
-            <div style={s.packageGrid}>
+            <div className="donation-package-grid" style={s.packageGrid}>
               {DONATION_PACKAGES.map((item) => {
                 const isSelected = item.quantity === selectedPackage.quantity;
 
@@ -234,7 +234,7 @@ export default function Donate() {
                 />
 
                 <p style={s.legacyLocationTitle}>خيارات احتياطية</p>
-                <div style={s.locationActions}>
+                <div className="location-actions" style={s.locationActions}>
                   <button type="button" onClick={useCurrentLocation} disabled={isLocating} style={s.locationButton}>
                     {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
                   </button>

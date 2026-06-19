@@ -49,7 +49,7 @@ export default function ThankYouReceipt() {
             {receipt.sessionID && <ReceiptRow label="جلسة الدفع" value={receipt.sessionID} dir="ltr" />}
           </div>
 
-          <div style={s.actions}>
+          <div className="receipt-actions" style={s.actions}>
             <a href={whatsappUrl} target="_blank" rel="noreferrer" className="btn-primary" style={s.action}>
               مشاركة الإيصال
             </a>
