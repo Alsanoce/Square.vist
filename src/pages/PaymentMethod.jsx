@@ -185,10 +185,13 @@ export default function PaymentMethod() {
             <label>{config.fieldLabel}</label>
             <input
               type="tel"
+              inputMode="numeric"
+              autoComplete="off"
               value={paymentNumber}
               onChange={(e) => setPaymentNumber(normalizeDigits(e.target.value))}
               placeholder={config.placeholder}
               dir="ltr"
+              aria-label={config.fieldLabel}
             />
             <p style={s.fieldHint}>{config.help}</p>
           </div>

@@ -15,6 +15,7 @@ const METHODS = [
     description: "أدخل رقم البطاقة وسيتم إرسال كود OTP لإتمام الدفع.",
     icon: "/payment-icons/yussor-pay.jpg",
     path: "/payment/yussor",
+    badge: "جديد",
   },
   {
     id: "mobicash",
@@ -74,10 +75,14 @@ export default function Payment() {
                 onClick={() => goToMethod(method)}
                 className="payment-method-button"
                 style={s.methodButton}
+                aria-label={`الدفع عبر ${method.title}`}
               >
-                <img src={method.icon} alt="" style={s.methodIcon} />
+                <img src={method.icon} alt={`شعار ${method.title}`} style={s.methodIcon} />
                 <span className="payment-method-copy" style={s.methodText}>
-                  <strong>{method.title}</strong>
+                  <span style={s.methodTitleRow}>
+                    <strong>{method.title}</strong>
+                    {method.badge && <span style={s.methodBadge}>{method.badge}</span>}
+                  </span>
                   <span>{method.description}</span>
                 </span>
               </button>
@@ -149,6 +154,24 @@ const s = {
   methodText: {
     display: "grid",
     gap: "0.3rem",
+  },
+  methodTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.55rem",
+    flexWrap: "wrap",
+  },
+  methodBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: 22,
+    padding: "0.15rem 0.55rem",
+    borderRadius: 999,
+    background: "rgba(0,200,150,0.14)",
+    border: "1px solid rgba(0,200,150,0.3)",
+    color: "var(--success)",
+    fontSize: "0.72rem",
+    fontWeight: 800,
   },
   backBtn: {
     display: "block",

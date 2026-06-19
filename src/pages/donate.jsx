@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MosqueLocationPicker from "../components/MosqueLocationPicker";
-import { CARTON_PRICE, DONATION_PACKAGES, createTransactionId, getDonationPackage } from "../lib/donationPricing";
+import {
+  CARTON_PRICE,
+  DONATION_PACKAGES,
+  MIN_DONATION_QUANTITY,
+  createTransactionId,
+  getDonationPackage,
+} from "../lib/donationPricing";
 
 function convertToEnglishDigits(input) {
   return input.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
@@ -184,7 +190,7 @@ export default function Donate() {
               <label style={s.customQuantityLabel}>أو اكتب عدد الكراتين</label>
               <input
                 type="number"
-                min="1"
+                min={MIN_DONATION_QUANTITY}
                 step="1"
                 inputMode="numeric"
                 value={selectedPackage.quantity}

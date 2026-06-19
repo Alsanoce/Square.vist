@@ -1,44 +1,51 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import OtpInput from "react-otp-input";
 import { callEdfaaly } from "../lib/edfaalyApi";
 import { callYussor } from "../lib/yussorApi";
 
+function normalizeDigits(value, maxLength) {
+  return String(value || "")
+    .replace(/[٠-٩]/g, (digit) => "٠١٢٣٤٥٦٧٨٩".indexOf(digit))
+    .replace(/\D/g, "")
+    .slice(0, maxLength);
+}
+
+function getOtpLength(isYussorPay) {
+  if (!isYussorPay) return 4;
+
+  const configured = Number(import.meta.env.VITE_YUSSOR_OTP_LENGTH || 4);
+  if (!Number.isInteger(configured)) return 4;
+  return Math.min(8, Math.max(4, configured));
+}
+
+function maskCardNumber(value) {
+  const cardNumber = String(value || "");
+  if (cardNumber.length <= 4) return cardNumber;
+  return `${"•".repeat(Math.min(cardNumber.length - 4, 6))}${cardNumber.slice(-4)}`;
+}
+
 export default function OtpConfirmationPage() {
   const [otp, setOtp] = useState("");
   const [status, setStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [resendDisabled, setResendDisabled] = useState(false);
-  const [countdown, setCountdown] = useState(60);
 
   const navigate = useNavigate();
   const { state } = useLocation();
   const payableAmount = Number(state?.amount || 0);
   const isYussorPay = state?.paymentProvider === "yussor";
+  const otpLength = getOtpLength(isYussorPay);
+  const paymentTarget = useMemo(
+    () =>
+      isYussorPay
+        ? maskCardNumber(state?.paymentNumber)
+        : state?.paymentPhone || state?.phone,
+    [isYussorPay, state]
+  );
 
   useEffect(() => {
     if (!state?.sessionID) navigate("/donate");
   }, [navigate, state]);
-
-  useEffect(() => {
-    let timer;
-
-    if (resendDisabled) {
-      timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setResendDisabled(false);
-            return 60;
-          }
-
-          return prev - 1;
-        });
-      }, 1000);
-    }
-
-    return () => clearInterval(timer);
-  }, [resendDisabled]);
 
   const isBankConfirmationOk = (response) => {
     const rawResponse = String(response?.rawResponse || "");
@@ -51,12 +58,9 @@ export default function OtpConfirmationPage() {
     );
   };
 
-  const handleResend = async () => {
-    setResendDisabled(true);
-    setStatus({
-      type: "warning",
-      msg: "لإعادة إرسال الكود يرجى الرجوع وإعادة بدء عملية الدفع",
-    });
+  const restartPayment = () => {
+    const path = isYussorPay ? "/payment/yussor" : "/payment/edfaaly";
+    navigate(path, { state });
   };
 
   const confirmYussorPay = () =>
@@ -93,8 +97,8 @@ export default function OtpConfirmationPage() {
   const handleConfirm = async () => {
     if (isLoading) return;
 
-    if (otp.length !== 4) {
-      setStatus({ type: "warning", msg: "الرجاء إدخال كود مكون من 4 أرقام" });
+    if (otp.length !== otpLength) {
+      setStatus({ type: "warning", msg: `الرجاء إدخال كود مكون من ${otpLength} أرقام` });
       return;
     }
 
@@ -113,10 +117,10 @@ export default function OtpConfirmationPage() {
           msg: confirmRes.message || "كود التأكيد غير صحيح أو العملية مرفوضة",
         });
       }
-    } catch (err) {
+    } catch (error) {
       setStatus({
         type: "error",
-        msg: err.message || "حدث خطأ أثناء التأكيد",
+        msg: error.message || "حدث خطأ أثناء التأكيد",
       });
     } finally {
       setIsLoading(false);
@@ -127,7 +131,7 @@ export default function OtpConfirmationPage() {
     <div className="page-wrapper">
       <div className="section" style={s.wrapper}>
         <div style={s.header}>
-          <div style={s.lockIcon}>🔐</div>
+          <div style={s.lockIcon} aria-hidden="true">🔐</div>
           <span className="section-tag">تأكيد الدفع</span>
           <h1 className="section-title">
             أدخل كود <span>التحقق</span>
@@ -137,18 +141,20 @@ export default function OtpConfirmationPage() {
         <div className="card" style={s.card}>
           <div style={s.infoBox}>
             <p style={s.infoText}>
-              تم إرسال كود التحقق إلى {isYussorPay ? "البطاقة" : "الرقم"}:
+              تم إرسال كود من {otpLength} أرقام إلى {isYussorPay ? "البطاقة" : "الرقم"}:
             </p>
-            <p style={s.phoneDisplay}>{state?.paymentPhone || state?.phone}</p>
+            <p style={s.phoneDisplay}>{paymentTarget}</p>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", margin: "1.8rem 0" }}>
+          <div className="otp-inputs-wrapper">
             <OtpInput
               value={otp}
-              onChange={setOtp}
-              numInputs={4}
-              renderInput={(props) => <input {...props} className="otp-single-input" dir="ltr" />}
-              containerStyle={{ gap: "0.8rem", direction: "ltr" }}
+              onChange={(value) => setOtp(normalizeDigits(value, otpLength))}
+              numInputs={otpLength}
+              renderInput={(props) => (
+                <input {...props} className="otp-single-input" inputMode="numeric" dir="ltr" />
+              )}
+              containerStyle="otp-inputs"
               shouldAutoFocus
             />
           </div>
@@ -162,6 +168,7 @@ export default function OtpConfirmationPage() {
                     ? "alert-warning"
                     : "alert-success"
               }`}
+              role="status"
             >
               {status.msg}
             </div>
@@ -182,20 +189,12 @@ export default function OtpConfirmationPage() {
             )}
           </button>
 
-          <button
-            onClick={handleResend}
-            disabled={resendDisabled || isLoading}
-            style={{
-              ...s.resendBtn,
-              color: resendDisabled ? "var(--text-muted)" : "var(--cyan)",
-              cursor: resendDisabled ? "not-allowed" : "pointer",
-            }}
-          >
-            {resendDisabled ? `إعادة إرسال (${countdown}s)` : "إعادة إرسال الكود"}
+          <button type="button" onClick={restartPayment} disabled={isLoading} style={s.resendBtn}>
+            الرجوع وإعادة إرسال الكود
           </button>
 
-          <button onClick={() => navigate("/donate")} style={s.backBtn}>
-            ← العودة للتبرع
+          <button type="button" onClick={() => navigate("/donate")} style={s.backBtn}>
+            العودة للتبرع
           </button>
         </div>
       </div>
@@ -208,7 +207,6 @@ const s = {
   header: { textAlign: "center", marginBottom: "2rem" },
   lockIcon: { fontSize: "3rem", marginBottom: "0.8rem" },
   card: { padding: "2.2rem" },
-
   infoBox: {
     textAlign: "center",
     background: "rgba(0,212,255,0.06)",
@@ -225,19 +223,19 @@ const s = {
     color: "var(--cyan)",
     direction: "ltr",
   },
-
   resendBtn: {
     display: "block",
     width: "100%",
     background: "transparent",
     border: "none",
+    color: "var(--cyan)",
     fontFamily: "'Tajawal', sans-serif",
     fontSize: "0.92rem",
     fontWeight: 600,
+    cursor: "pointer",
     marginTop: "1rem",
     padding: "0.5rem",
     textAlign: "center",
-    transition: "color 0.3s",
   },
   backBtn: {
     display: "block",
