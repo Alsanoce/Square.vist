@@ -1,5 +1,5 @@
 export const CARTON_PRICE = 7;
-export const MIN_DONATION_QUANTITY = 1;
+export const MIN_DONATION_QUANTITY = 4;
 export const DONATION_PACKAGE_QUANTITIES = [4, 5, 10, 20, 40];
 
 export const DONATION_PACKAGES = DONATION_PACKAGE_QUANTITIES.map((quantity) => ({

@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MosqueLocationPicker from "../components/MosqueLocationPicker";
-import { CARTON_PRICE, DONATION_PACKAGES, createTransactionId, getDonationPackage } from "../lib/donationPricing";
+import {
+  CARTON_PRICE,
+  DONATION_PACKAGES,
+  MIN_DONATION_QUANTITY,
+  createTransactionId,
+  getDonationPackage,
+} from "../lib/donationPricing";
 
 function convertToEnglishDigits(input) {
   return input.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
@@ -159,7 +165,7 @@ export default function Donate() {
 
           <div className="form-group">
             <label>عدد كراتين الماء</label>
-            <div style={s.packageGrid}>
+            <div className="donation-package-grid" style={s.packageGrid}>
               {DONATION_PACKAGES.map((item) => {
                 const isSelected = item.quantity === selectedPackage.quantity;
 
@@ -184,7 +190,7 @@ export default function Donate() {
               <label style={s.customQuantityLabel}>أو اكتب عدد الكراتين</label>
               <input
                 type="number"
-                min="1"
+                min={MIN_DONATION_QUANTITY}
                 step="1"
                 inputMode="numeric"
                 value={selectedPackage.quantity}
@@ -234,7 +240,7 @@ export default function Donate() {
                 />
 
                 <p style={s.legacyLocationTitle}>خيارات احتياطية</p>
-                <div style={s.locationActions}>
+                <div className="location-actions" style={s.locationActions}>
                   <button type="button" onClick={useCurrentLocation} disabled={isLocating} style={s.locationButton}>
                     {isLocating ? "جاري تحديد الموقع..." : "استخدم موقعي الحالي"}
                   </button>

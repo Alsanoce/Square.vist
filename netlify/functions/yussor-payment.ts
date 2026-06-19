@@ -22,9 +22,13 @@ type YussorSession = {
   creds?: number;
   tag?: number;
   value?: string;
+  savedAt?: string;
 };
 
 const ENDPOINT_BASE = "/api/OnlinePaymentServices";
+const SESSION_MAX_AGE_MS = 15 * 60 * 1000;
+
+class PublicPaymentError extends Error {}
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -44,10 +48,14 @@ export default async (req: Request) => {
 
     return json({ success: false, message: "invalid action" }, 400);
   } catch (error) {
+    console.error("[yussor-payment]", error);
     return json(
       {
         success: false,
-        message: error instanceof Error ? error.message : String(error),
+        message:
+          error instanceof PublicPaymentError
+            ? error.message
+            : "تعذر إكمال عملية يسر باي حاليا. حاول مرة أخرى.",
       },
       500
     );
@@ -107,6 +115,10 @@ async function completeSession(body: Record<string, unknown>) {
   const session = await loadSession(transactionId);
   const response = await yussorPost("CompleteSession", { otp }, session);
 
+  if (response.type === 1) {
+    await deleteSession(transactionId);
+  }
+
   return normalizeYussorResponse(response, {
     sessionID: transactionId,
     transactionId,
@@ -122,7 +134,7 @@ async function signIn() {
   });
 
   if (response.type !== 1 || !response.content) {
-    throw new Error(firstMessage(response) || "تعذر تسجيل الدخول إلى يسر باي");
+    throw new PublicPaymentError(firstMessage(response) || "تعذر تسجيل الدخول إلى يسر باي");
   }
 
   return response;
@@ -151,6 +163,7 @@ async function yussorPost(
       method: "POST",
       headers,
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(25000),
     }
   );
 
@@ -158,7 +171,9 @@ async function yussorPost(
   const data = text ? JSON.parse(text) : {};
 
   if (!response.ok) {
-    throw new Error(firstMessage(data) || response.statusText);
+    throw new PublicPaymentError(
+      firstMessage(data) || "تعذر الاتصال بخدمة يسر باي. حاول مرة أخرى."
+    );
   }
 
   return data;
@@ -177,10 +192,26 @@ async function loadSession(transactionId: string) {
   const session = await store.get(sessionKey(transactionId), { type: "json" });
 
   if (!session || typeof session !== "object") {
-    throw new Error("انتهت جلسة الدفع، الرجاء بدء العملية من جديد");
+    throw new PublicPaymentError("انتهت جلسة الدفع، الرجاء بدء العملية من جديد");
   }
 
-  return session as YussorSession;
+  const typedSession = session as YussorSession;
+  const savedAt = Date.parse(typedSession.savedAt || "");
+  const validTo = Date.parse(typedSession.validTo || "");
+  const isTooOld = Number.isFinite(savedAt) && Date.now() - savedAt > SESSION_MAX_AGE_MS;
+  const isProviderExpired = Number.isFinite(validTo) && validTo <= Date.now();
+
+  if (isTooOld || isProviderExpired) {
+    await deleteSession(transactionId);
+    throw new PublicPaymentError("انتهت جلسة الدفع، الرجاء بدء العملية من جديد");
+  }
+
+  return typedSession;
+}
+
+async function deleteSession(transactionId: string) {
+  const store = getStore({ name: "yussor-pay-sessions", consistency: "strong" });
+  await store.delete(sessionKey(transactionId));
 }
 
 function normalizeYussorResponse(
@@ -192,7 +223,7 @@ function normalizeYussorResponse(
     success,
     message: firstMessage(response) || (success ? "تمت العملية بنجاح" : "تعذر إكمال العملية"),
     ...extra,
-    yussor: response,
+    traceId: response.traceId || "",
   };
 }
 
@@ -218,7 +249,10 @@ function readEnv(name: string, fallback = "") {
 
 function requiredEnv(name: string) {
   const value = readEnv(name);
-  if (!value) throw new Error(`Missing ${name}`);
+  if (!value) {
+    console.error(`[yussor-payment] Missing required environment variable: ${name}`);
+    throw new PublicPaymentError("خدمة يسر باي غير متاحة حاليا. حاول لاحقا.");
+  }
   return value;
 }
 
@@ -236,6 +270,7 @@ function json(payload: unknown, status = 200) {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
     },
   });
 }

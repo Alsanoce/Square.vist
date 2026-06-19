@@ -195,7 +195,7 @@ export default function Home() {
 
       {/* ══════════ ABOUT ══════════ */}
       <section className="section" style={{ paddingTop: "4rem" }}>
-        <div style={s.aboutGrid}>
+        <div className="about-grid" style={s.aboutGrid}>
           <div>
             <span className="section-tag">عن المبادرة</span>
             <h2 className="section-title" style={{ marginBottom: "1.2rem" }}>
