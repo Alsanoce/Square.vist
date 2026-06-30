@@ -6,6 +6,8 @@ const DIRECT_YUSSOR_ACTIONS = {
   completeSession: "complete-session",
 };
 
+const YUSSOR_TIMEOUT_MS = 90000;
+
 export async function callYussor(action, payload = {}) {
   if (isDirectYussorEndpoint()) {
     return callDirectYussor(action, payload);
@@ -64,7 +66,7 @@ async function callDirectYussor(action, payload) {
 
 async function postJson(url, payload) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 30000);
+  const timeout = window.setTimeout(() => controller.abort(), YUSSOR_TIMEOUT_MS);
 
   try {
     const response = await fetch(url, {
