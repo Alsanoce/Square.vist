@@ -14,7 +14,7 @@ function normalizeDigits(value, maxLength) {
 function getOtpLength(isYussorPay) {
   if (!isYussorPay) return 4;
 
-  const configured = Number(import.meta.env.VITE_YUSSOR_OTP_LENGTH || 4);
+  const configured = Number(import.meta.env.VITE_YUSSOR_OTP_LENGTH || 6);
   if (!Number.isInteger(configured)) return 4;
   return Math.min(8, Math.max(4, configured));
 }
