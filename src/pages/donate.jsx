@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import MosqueLocationPicker from "../components/MosqueLocationPicker";
 import {
   CARTON_PRICE,
@@ -14,13 +14,14 @@ function convertToEnglishDigits(input) {
 }
 
 export default function Donate() {
+  const { state } = useLocation();
   const [donorName, setDonorName] = useState("");
   const [phone, setPhone] = useState("");
   const [mosque, setMosque] = useState("");
   const [mosqueAddress, setMosqueAddress] = useState("");
   const [mosqueLocation, setMosqueLocation] = useState("");
   const [isLocating, setIsLocating] = useState(false);
-  const [quantity, setQuantity] = useState(DONATION_PACKAGES[0].quantity);
+  const [quantity, setQuantity] = useState(state?.quickQuantity || DONATION_PACKAGES[0].quantity);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 

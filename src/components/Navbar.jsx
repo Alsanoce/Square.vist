@@ -2,10 +2,37 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 const LINKS = [
-  { to: "/", label: "الرئيسية" },
-  { to: "/about", label: "من نحن" },
-  { to: "/donate", label: "تبرع الآن", cta: true },
+  { href: "/", label: "الرئيسية", type: "route" },
+  { href: "/#current-needs", label: "المشاريع", type: "anchor" },
+  { href: "/#water-request-preview", label: "طلب ماء لمسجد", type: "anchor" },
+  { href: "/about", label: "عن سانية", type: "route" },
+  { href: "/#reports-preview", label: "التقارير", type: "anchor" },
+  { href: "/#contact-preview", label: "تواصل معنا", type: "anchor" },
 ];
+
+const BOTTOM_LINKS = [
+  { href: "/", label: "الرئيسية", type: "route" },
+  { href: "/#current-needs", label: "المشاريع", type: "anchor" },
+  { href: "/donate", label: "تبرع الآن", type: "route", primary: true },
+  { href: "/#water-request-preview", label: "طلب ماء", type: "anchor" },
+  { href: "/#reports-preview", label: "التقارير", type: "anchor" },
+];
+
+function NavItem({ item, className, onClick }) {
+  if (item.type === "route") {
+    return (
+      <Link to={item.href} className={className} onClick={onClick}>
+        {item.label}
+      </Link>
+    );
+  }
+
+  return (
+    <a href={item.href} className={className} onClick={onClick}>
+      {item.label}
+    </a>
+  );
+}
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -18,25 +45,26 @@ export default function Navbar() {
   return (
     <>
       <nav className="site-nav" aria-label="التنقل الرئيسي">
-        <Link to="/" className="site-logo" aria-label="سقيا ماء - الرئيسية">
-          <span aria-hidden="true">💧</span>
-          <span className="site-logo-name">سقيا</span> ماء
+        <Link to="/" className="site-logo" aria-label="سانية، الرئيسية">
+          <span className="site-logo-mark" aria-hidden="true" />
+          <span className="site-logo-name">سانية</span>
+          <span className="site-logo-sub">ماء</span>
         </Link>
 
         <ul className="site-nav-links">
           {LINKS.map((link) => (
-            <li key={link.to}>
-              <Link
-                to={link.to}
-                className={`site-nav-link${link.cta ? " site-nav-cta" : ""}${
-                  pathname === link.to && !link.cta ? " is-active" : ""
-                }`}
-              >
-                {link.label}
-              </Link>
+            <li key={link.href + link.label}>
+              <NavItem
+                item={link}
+                className={`site-nav-link${pathname === link.href ? " is-active" : ""}`}
+              />
             </li>
           ))}
         </ul>
+
+        <Link to="/donate" className="site-nav-cta">
+          تبرع الآن
+        </Link>
 
         <button
           type="button"
@@ -53,16 +81,28 @@ export default function Navbar() {
       {menuOpen && (
         <div id="mobile-navigation" className="site-mobile-menu">
           {LINKS.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`site-mobile-link${link.cta ? " site-mobile-cta" : ""}`}
-            >
-              {link.label}
-            </Link>
+            <NavItem
+              key={link.href + link.label}
+              item={link}
+              className="site-mobile-link"
+              onClick={() => setMenuOpen(false)}
+            />
           ))}
+          <Link to="/donate" className="site-mobile-link site-mobile-cta">
+            تبرع الآن
+          </Link>
         </div>
       )}
+
+      <nav className="bottom-nav" aria-label="تنقل الموبايل">
+        {BOTTOM_LINKS.map((link) => (
+          <NavItem
+            key={link.href + link.label}
+            item={link}
+            className={`bottom-nav-link${link.primary ? " bottom-nav-primary" : ""}`}
+          />
+        ))}
+      </nav>
     </>
   );
 }
