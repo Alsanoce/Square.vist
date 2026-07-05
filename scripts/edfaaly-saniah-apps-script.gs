@@ -26,6 +26,7 @@ const CONFIG = {
   SPREADSHEET_NAME: "سقيا ماء - عمليات الدفع",
   SHEET_NAME: "edfaly pyment",
   BANK_TRANSFER_SHEET_NAME: "BankTransfers",
+  YUSSOR_SHEET_NAME: "Yousser pay",
 
   BANK_ENDPOINT: "http://62.240.55.2:6187/BCDUssd/NewEdfali.asmx",
 
@@ -74,6 +75,32 @@ const BANK_TRANSFER_HEADERS = [
   "Telegram Sent",
 ];
 
+const YUSSOR_HEADERS = [
+  "Timestamp",
+  "Transaction ID",
+  "Action",
+  "Status",
+  "Donor Name",
+  "Donor Phone",
+  "WhatsApp",
+  "Amount",
+  "Quantity",
+  "Unit Price",
+  "Mosque",
+  "Mosque Address",
+  "Mosque Location",
+  "Payment Method",
+  "Card Last4",
+  "Yussor Type",
+  "Yussor Message",
+  "Trace ID",
+  "Session ID",
+  "Telegram Sent",
+  "Delegate Sent",
+  "Donor Sent",
+  "Notes",
+];
+
 function doGet(e) {
   const callback = getParam(e, "callback", "");
 
@@ -95,6 +122,8 @@ function doGet(e) {
       result = handleCreateBankTransferRequest(e);
     } else if (action === "getPublicStats") {
       result = handleGetPublicStats();
+    } else if (action === "logYussorPayment") {
+      result = handleLogYussorPayment(e);
     } else if (action === "health") {
       result = { success: true, message: "Saniah payment API is running" };
     } else {
@@ -285,6 +314,81 @@ function handleCreateBankTransferRequest(e) {
       success: false,
       message: "تعذر تسجيل طلب الحوالة المصرفية",
       sheetName: CONFIG.BANK_TRANSFER_SHEET_NAME,
+    };
+  }
+}
+
+function handleLogYussorPayment(e) {
+  const data = {
+    timestamp: new Date(),
+    transactionId: getParam(e, "transactionId"),
+    action: getParam(e, "yussorAction") || getParam(e, "paymentAction"),
+    status: getParam(e, "status"),
+    donorName: getParam(e, "donorName"),
+    donorPhone: getParam(e, "donorPhone") || getParam(e, "phone"),
+    whatsapp: getParam(e, "whatsapp") || getParam(e, "donorPhone") || getParam(e, "phone"),
+    amount: normalizeAmount(getParam(e, "amount")),
+    quantity: getParam(e, "quantity"),
+    unitPrice: getParam(e, "unitPrice"),
+    mosque: getParam(e, "mosque") || getParam(e, "meterNumber"),
+    mosqueAddress: getParam(e, "mosqueAddress"),
+    mosqueLocation: getParam(e, "mosqueLocation"),
+    paymentMethod: getParam(e, "paymentMethod", "يسر باي"),
+    cardLast4: getParam(e, "cardLast4"),
+    yussorType: getParam(e, "yussorType"),
+    yussorMessage: getParam(e, "yussorMessage"),
+    traceId: getParam(e, "traceId"),
+    sessionId: getParam(e, "sessionID") || getParam(e, "sessionId") || getParam(e, "transactionId"),
+    notes: getParam(e, "notes"),
+  };
+
+  if (!data.transactionId || !data.action) {
+    return {
+      success: false,
+      message: "missing yussor transactionId or action",
+    };
+  }
+
+  try {
+    const sheet = getYussorSheet();
+    const isPaid = isConfirmedStatus(data.status);
+
+    if (isPaid && findYussorPaidRow(sheet, data.transactionId) > 0) {
+      return {
+        success: true,
+        duplicate: true,
+        message: "Yousser pay success already logged",
+        transactionId: data.transactionId,
+      };
+    }
+
+    const row = appendYussorRow(sheet, data);
+    const notifications = {
+      telegram: { success: false, message: "not attempted" },
+      delegate: { success: false, message: "not attempted" },
+      donor: { success: false, message: "not attempted" },
+    };
+
+    if (isPaid) {
+      notifications.telegram = notifyTelegramYussorPaid(data);
+      notifications.delegate = notifyYussorDelegateWhatsApp(data);
+      notifications.donor = notifyYussorDonorWhatsApp(data);
+      updateYussorNotificationStatus(sheet, row, notifications);
+    }
+
+    return {
+      success: true,
+      transactionId: data.transactionId,
+      sheetName: CONFIG.YUSSOR_SHEET_NAME,
+      row,
+      notifications,
+    };
+  } catch (err) {
+    Logger.log(`handleLogYussorPayment error: ${err.message}`);
+    logBackendError("logYussorPayment", err.message || String(err));
+    return {
+      success: false,
+      message: err.message || String(err),
     };
   }
 }
@@ -565,6 +669,10 @@ function getBankTransferSheet() {
   return getOrCreateSheet(CONFIG.BANK_TRANSFER_SHEET_NAME, BANK_TRANSFER_HEADERS);
 }
 
+function getYussorSheet() {
+  return getOrCreateSheet(CONFIG.YUSSOR_SHEET_NAME, YUSSOR_HEADERS);
+}
+
 function getOrCreateSheet(sheetName, headers) {
   const ss = getSpreadsheet();
   let sheet = ss.getSheetByName(sheetName);
@@ -642,6 +750,77 @@ function appendBankTransferRow(sheet, data) {
   setRowValue(row, headerMap, "Telegram Sent", "NO");
 
   sheet.appendRow(row);
+}
+
+function appendYussorRow(sheet, data) {
+  const headerMap = getHeaderMap(sheet);
+  const row = new Array(sheet.getLastColumn()).fill("");
+
+  setRowValue(row, headerMap, "Timestamp", data.timestamp);
+  setRowValue(row, headerMap, "Transaction ID", data.transactionId);
+  setRowValue(row, headerMap, "Action", data.action);
+  setRowValue(row, headerMap, "Status", data.status);
+  setRowValue(row, headerMap, "Donor Name", data.donorName);
+  setRowValue(row, headerMap, "Donor Phone", data.donorPhone);
+  setRowValue(row, headerMap, "WhatsApp", data.whatsapp);
+  setRowValue(row, headerMap, "Amount", data.amount);
+  setRowValue(row, headerMap, "Quantity", data.quantity);
+  setRowValue(row, headerMap, "Unit Price", data.unitPrice);
+  setRowValue(row, headerMap, "Mosque", data.mosque);
+  setRowValue(row, headerMap, "Mosque Address", data.mosqueAddress);
+  setRowValue(row, headerMap, "Mosque Location", data.mosqueLocation);
+  setRowValue(row, headerMap, "Payment Method", data.paymentMethod);
+  setRowValue(row, headerMap, "Card Last4", data.cardLast4);
+  setRowValue(row, headerMap, "Yussor Type", data.yussorType);
+  setRowValue(row, headerMap, "Yussor Message", data.yussorMessage);
+  setRowValue(row, headerMap, "Trace ID", data.traceId);
+  setRowValue(row, headerMap, "Session ID", data.sessionId);
+  setRowValue(row, headerMap, "Telegram Sent", "NO");
+  setRowValue(row, headerMap, "Delegate Sent", "NO");
+  setRowValue(row, headerMap, "Donor Sent", "NO");
+  setRowValue(row, headerMap, "Notes", data.notes);
+
+  sheet.appendRow(row);
+  return sheet.getLastRow();
+}
+
+function findYussorPaidRow(sheet, transactionId) {
+  const headerMap = getHeaderMap(sheet);
+  const transactionColumn = headerMap["Transaction ID"];
+  const statusColumn = headerMap["Status"];
+
+  if (!transactionColumn || !statusColumn || sheet.getLastRow() < 2) return -1;
+
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  const wanted = String(transactionId || "").trim();
+
+  for (let i = 0; i < values.length; i += 1) {
+    const row = values[i];
+    const rowTransactionId = String(row[transactionColumn - 1] || "").trim();
+    const rowStatus = row[statusColumn - 1];
+
+    if (rowTransactionId === wanted && isConfirmedStatus(rowStatus)) {
+      return i + 2;
+    }
+  }
+
+  return -1;
+}
+
+function updateYussorNotificationStatus(sheet, row, notifications) {
+  const headerMap = getHeaderMap(sheet);
+
+  if (headerMap["Telegram Sent"]) {
+    sheet.getRange(row, headerMap["Telegram Sent"]).setValue(notifications.telegram.success ? "YES" : `NO: ${notifications.telegram.message || ""}`);
+  }
+
+  if (headerMap["Delegate Sent"]) {
+    sheet.getRange(row, headerMap["Delegate Sent"]).setValue(notifications.delegate.success ? "YES" : `NO: ${notifications.delegate.message || ""}`);
+  }
+
+  if (headerMap["Donor Sent"]) {
+    sheet.getRange(row, headerMap["Donor Sent"]).setValue(notifications.donor.success ? "YES" : `NO: ${notifications.donor.message || ""}`);
+  }
 }
 
 function setRowValue(row, headerMap, header, value) {
@@ -858,6 +1037,168 @@ function notifyTelegramBankTransferPaid(data) {
       message: err.message || String(err),
     };
   }
+}
+
+function notifyTelegramYussorPaid(data) {
+  try {
+    const lines = [
+      "✅ عملية يسر باي ناجحة",
+      "",
+      `رقم العملية: ${data.transactionId || "-"}`,
+      `المتبرع: ${data.donorName || "-"}`,
+      `رقم المتبرع: ${formatLibyanPhone(data.donorPhone || data.whatsapp || "-")}`,
+      `طريقة الدفع: ${data.paymentMethod || "يسر باي"}`,
+      `المبلغ: ${data.amount || "-"} دينار`,
+      `عدد الكراتين: ${data.quantity || "-"}`,
+      `سعر الكرتونة: ${data.unitPrice || "-"}`,
+      "",
+      `المسجد: ${data.mosque || "-"}`,
+      `العنوان: ${data.mosqueAddress || "-"}`,
+      `الموقع: ${data.mosqueLocation || "-"}`,
+      "",
+      `Trace ID: ${data.traceId || "-"}`,
+      `وقت العملية: ${new Date().toLocaleString("en-GB", { timeZone: "Africa/Tripoli" })}`,
+    ];
+
+    return sendTelegramMessage(lines.join("\n"));
+  } catch (err) {
+    Logger.log(`notifyTelegramYussorPaid error: ${err.message}`);
+    return {
+      success: false,
+      message: err.message || String(err),
+    };
+  }
+}
+
+function notifyYussorDelegateWhatsApp(data) {
+  const lines = [
+    "🚰 طلب سقيا جديد",
+    "",
+    `اسم المتبرع: ${data.donorName || "-"}`,
+    `رقم المتبرع: ${formatLibyanPhone(data.donorPhone || data.whatsapp || "-")}`,
+    `المسجد: ${data.mosque || "-"}`,
+    `العنوان: ${data.mosqueAddress || "-"}`,
+    `الموقع: ${data.mosqueLocation || "-"}`,
+    `عدد الكراتين: ${data.quantity || "-"}`,
+    `الإجمالي: ${data.amount || "-"} دينار`,
+    `رقم العملية: ${data.transactionId || "-"}`,
+    "طريقة الدفع: يسر باي",
+  ];
+
+  return sendEvolutionMessage(lines.join("\n"));
+}
+
+function notifyYussorDonorWhatsApp(data) {
+  const donorNumber = data.whatsapp || data.donorPhone;
+  const lines = [
+    "جزاك الله خيراً",
+    "",
+    "تم استلام تبرعك بنجاح عبر يسر باي.",
+    "",
+    `رقم العملية: ${data.transactionId || "-"}`,
+    `عدد الكراتين: ${data.quantity || "-"}`,
+    `الإجمالي: ${data.amount || "-"} دينار`,
+    `المسجد: ${data.mosque || "-"}`,
+    "",
+    "سيتم توصيل المياه للمسجد المحدد بإذن الله.",
+  ];
+
+  return sendEvolutionMessageTo(donorNumber, lines.join("\n"));
+}
+
+function sendEvolutionMessage(text) {
+  const evolution = getEvolutionConfig();
+
+  if (!evolution.delegateNumber) {
+    return {
+      success: false,
+      message: "missing DELEGATE_WHATSAPP_NUMBER in Script Properties",
+    };
+  }
+
+  return sendEvolutionMessageTo(evolution.delegateNumber, text, evolution);
+}
+
+function sendEvolutionMessageTo(phoneNumber, text, evolutionConfig) {
+  const evolution = evolutionConfig || getEvolutionConfig();
+  const number = normalizeEvolutionWhatsAppNumber(phoneNumber);
+
+  if (!evolution.apiUrl || !evolution.apiKey || !evolution.instanceName || !number) {
+    return {
+      success: false,
+      message: "missing EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE_NAME or target number",
+    };
+  }
+
+  try {
+    const response = UrlFetchApp.fetch(
+      `${evolution.apiUrl.replace(/\/+$/, "")}/message/sendText/${encodeURIComponent(evolution.instanceName)}`,
+      {
+        method: "post",
+        contentType: "application/json",
+        muteHttpExceptions: true,
+        headers: {
+          apikey: evolution.apiKey,
+        },
+        payload: JSON.stringify({
+          number,
+          text,
+        }),
+      }
+    );
+
+    const statusCode = response.getResponseCode();
+    const raw = response.getContentText();
+    let body = {};
+
+    try {
+      body = JSON.parse(raw);
+    } catch (err) {
+      body = { raw };
+    }
+
+    return {
+      success: statusCode >= 200 && statusCode < 300 && !body.error,
+      statusCode,
+      message: body.description || body.message || body.error || (statusCode >= 200 && statusCode < 300 ? "sent" : "Evolution API request failed"),
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err.message || String(err),
+    };
+  }
+}
+
+function getEvolutionConfig() {
+  return {
+    apiUrl: String(getScriptProperty("EVOLUTION_API_URL") || "").trim(),
+    apiKey: String(getScriptProperty("EVOLUTION_API_KEY") || "").trim(),
+    instanceName: String(getScriptProperty("EVOLUTION_INSTANCE_NAME") || "").trim(),
+    delegateNumber: normalizeEvolutionWhatsAppNumber(getScriptProperty("DELEGATE_WHATSAPP_NUMBER") || ""),
+  };
+}
+
+function normalizeEvolutionWhatsAppNumber(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+  if (raw.indexOf("@g.us") > -1) return raw;
+
+  const digits = raw
+    .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+    .replace(/\D/g, "");
+
+  if (/^0?9\d{8}$/.test(digits)) return `218${digits.replace(/^0/, "")}`;
+  if (/^2189\d{8}$/.test(digits)) return digits;
+
+  return digits || raw.replace(/@c\.us$/i, "");
+}
+
+function formatLibyanPhone(value) {
+  const number = normalizeEvolutionWhatsAppNumber(value);
+  if (/^2189\d{8}$/.test(number)) return `+${number}`;
+  return String(value || "-");
 }
 
 function sendTelegramMessage(text) {
