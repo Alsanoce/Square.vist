@@ -22,7 +22,7 @@
 
 const CONFIG = {
   // If empty, the script creates a new spreadsheet automatically and stores its ID in Script Properties.
-  SPREADSHEET_ID: "",
+  SPREADSHEET_ID: "1GKoH0zgxCN-uxwpaC662elfiU7DVfGdCMRmPO8r8fYY",
   SPREADSHEET_NAME: "سقيا ماء - عمليات الدفع",
   SHEET_NAME: "edfaly pyment",
   BANK_TRANSFER_SHEET_NAME: "BankTransfers",
@@ -31,8 +31,8 @@ const CONFIG = {
   BANK_ENDPOINT: "http://62.240.55.2:6187/BCDUssd/NewEdfali.asmx",
 
   // Fill these from the bank.
-  MERCHANT_MOBILE: "9XXXXXXXX",
-  MERCHANT_PIN: "0000",
+  MERCHANT_MOBILE: "926388438",
+  MERCHANT_PIN: "2715",
   SERVICE_PASSWORD: "123@xdsr$#!!",
 
   // Telegram notifications are read from Script Properties first:
@@ -140,6 +140,8 @@ function handleGetPublicStats() {
   try {
     const acc = {
       cartonsDistributed: 0,
+      totalAmount: 0,
+      donationsCount: 0,
       mosques: {},
       donors: {},
       unitPrices: [],
@@ -147,6 +149,7 @@ function handleGetPublicStats() {
 
     collectStatsFromEdfaalySheet(acc);
     collectStatsFromBankTransferSheet(acc);
+    collectStatsFromYussorSheet(acc);
 
     const cartonPrice = acc.unitPrices.length
       ? Math.min.apply(null, acc.unitPrices)
@@ -156,9 +159,12 @@ function handleGetPublicStats() {
       success: true,
       stats: {
         cartonsDistributed: acc.cartonsDistributed,
+        totalAmount: acc.totalAmount,
+        donationsCount: acc.donationsCount,
         mosquesServed: Object.keys(acc.mosques).length,
         donorsCount: Object.keys(acc.donors).length,
         cartonPrice,
+        completedProjects: acc.donationsCount,
       },
     };
   } catch (err) {
@@ -184,6 +190,7 @@ function collectStatsFromEdfaalySheet(acc) {
     if (!isConfirmedStatus(status) && String(resultCode || "").trim().toUpperCase() !== "OK") return;
 
     addStatsEntry(acc, {
+      amount: getRowValue(row, headerMap, "amount"),
       quantity: getRowValue(row, headerMap, "quantity"),
       unitPrice: getRowValue(row, headerMap, "unitPrice"),
       donor: getRowValue(row, headerMap, "donorName") || getRowValue(row, headerMap, "donorPhone"),
@@ -204,6 +211,7 @@ function collectStatsFromBankTransferSheet(acc) {
     if (!isConfirmedStatus(status)) return;
 
     addStatsEntry(acc, {
+      amount: getRowValue(row, headerMap, "Amount"),
       quantity: getRowValue(row, headerMap, "Quantity"),
       unitPrice: getRowValue(row, headerMap, "Unit Price"),
       donor: getRowValue(row, headerMap, "Donor Name") || getRowValue(row, headerMap, "Phone") || getRowValue(row, headerMap, "WhatsApp"),
@@ -212,13 +220,42 @@ function collectStatsFromBankTransferSheet(acc) {
   });
 }
 
+function collectStatsFromYussorSheet(acc) {
+  const sheet = getYussorSheet();
+  if (sheet.getLastRow() < 2) return;
+
+  const headerMap = getHeaderMap(sheet);
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+
+  values.forEach((row) => {
+    const action = String(getRowValue(row, headerMap, "Action") || "").trim().toLowerCase();
+    const status = getRowValue(row, headerMap, "Status");
+    const yussorType = String(getRowValue(row, headerMap, "Yussor Type") || "").trim();
+    const isCompletedSession = action === "completesession" || action === "complete-session";
+    const isSuccessful = yussorType === "1" || isConfirmedStatus(status);
+
+    if (!isCompletedSession || !isSuccessful) return;
+
+    addStatsEntry(acc, {
+      amount: getRowValue(row, headerMap, "Amount"),
+      quantity: getRowValue(row, headerMap, "Quantity"),
+      unitPrice: getRowValue(row, headerMap, "Unit Price"),
+      donor: getRowValue(row, headerMap, "Donor Name") || getRowValue(row, headerMap, "Donor Phone") || getRowValue(row, headerMap, "WhatsApp"),
+      mosque: getRowValue(row, headerMap, "Mosque"),
+    });
+  });
+}
+
 function addStatsEntry(acc, entry) {
   const quantity = toNumber(entry.quantity);
   const unitPrice = toNumber(entry.unitPrice);
+  const amount = toNumber(entry.amount) || (quantity > 0 && unitPrice > 0 ? quantity * unitPrice : 0);
   const donor = normalizeStatsKey(entry.donor);
   const mosque = normalizeStatsKey(entry.mosque);
 
   if (quantity > 0) acc.cartonsDistributed += quantity;
+  if (amount > 0) acc.totalAmount += amount;
+  acc.donationsCount += 1;
   if (unitPrice > 0) acc.unitPrices.push(unitPrice);
   if (donor) acc.donors[donor] = true;
   if (mosque) acc.mosques[mosque] = true;

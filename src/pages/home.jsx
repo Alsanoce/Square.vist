@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { callEdfaaly } from "../lib/edfaalyApi";
 import { CARTON_PRICE } from "../lib/donationPricing";
@@ -11,7 +11,7 @@ const FALLBACK_STATS = {
   donorsCount: 320,
   mosquesServed: 38,
   cartonsDistributed: 1240,
-  completedProjects: 48,
+  totalAmount: 7440,
 };
 
 const REQUEST_CARDS = [
@@ -134,17 +134,17 @@ export default function Home() {
       .then((response) => {
         if (cancelled || !response?.success || !response.stats) return;
 
+        const cartonsDistributed = numberOrFallback(
+          response.stats.cartonsDistributed,
+          FALLBACK_STATS.cartonsDistributed
+        );
+        const cartonPrice = numberOrFallback(response.stats.cartonPrice, CARTON_PRICE);
+
         setStats({
           donorsCount: numberOrFallback(response.stats.donorsCount, FALLBACK_STATS.donorsCount),
           mosquesServed: numberOrFallback(response.stats.mosquesServed, FALLBACK_STATS.mosquesServed),
-          cartonsDistributed: numberOrFallback(
-            response.stats.cartonsDistributed,
-            FALLBACK_STATS.cartonsDistributed
-          ),
-          completedProjects: numberOrFallback(
-            response.stats.completedProjects,
-            FALLBACK_STATS.completedProjects
-          ),
+          cartonsDistributed,
+          totalAmount: numberOrFallback(response.stats.totalAmount, cartonsDistributed * cartonPrice),
         });
       })
       .catch(() => {
@@ -157,10 +157,6 @@ export default function Home() {
   }, []);
 
   const total = quantity * CARTON_PRICE;
-  const litersProvided = useMemo(
-    () => Math.round(numberOrFallback(stats.cartonsDistributed, 0) * 24 * 0.6),
-    [stats.cartonsDistributed]
-  );
 
   const updateQuantity = (direction) => {
     setQuantity((current) => Math.max(MIN_QUICK_QUANTITY, current + direction * QUICK_STEP));
@@ -230,8 +226,8 @@ export default function Home() {
       <section className="home-stats-strip" aria-label="إحصائيات سانية">
         <StatCard value={stats.donorsCount} label="متبرع كريم" />
         <StatCard value={stats.mosquesServed} label="مسجد مستفيد" />
-        <StatCard value={litersProvided} label="لتر ماء موفر" />
-        <StatCard value={stats.completedProjects} label="مشروع مكتمل" />
+        <StatCard value={stats.cartonsDistributed} label="كرتونة ماء" />
+        <StatCard value={stats.totalAmount} label="دينار تبرعات" />
       </section>
 
       <section id="current-needs" className="home-section home-needs-section">
