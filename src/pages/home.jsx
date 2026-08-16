@@ -209,7 +209,7 @@ export default function Home() {
               </button>
             </div>
 
-            <p>كل كرتونة 24 عبوة × 600 مل</p>
+            <p>كل كرتونة 12 عبوة × 500 مل</p>
 
             <div className="quick-total">
               <span>الإجمالي</span>
