@@ -223,13 +223,16 @@ export default function Home() {
         </div>
       </section>
 
+      {/* قسم الإحصائيات مخفي مؤقتًا بطلب من المشرف
       <section className="home-stats-strip" aria-label="إحصائيات سانية">
         <StatCard value={stats.donorsCount} label="متبرع كريم" />
         <StatCard value={stats.mosquesServed} label="مسجد مستفيد" />
         <StatCard value={stats.cartonsDistributed} label="كرتونة ماء" />
         <StatCard value={stats.totalAmount} label="دينار تبرعات" />
       </section>
+      */}
 
+      {/* قسم طلبات مياه المساجد مخفي مؤقتًا بطلب من المشرف
       <section id="current-needs" className="home-section home-needs-section">
         <div className="home-section-heading">
           <span className="home-eyebrow">احتياجات المساجد الحالية</span>
@@ -245,6 +248,7 @@ export default function Home() {
           ))}
         </div>
       </section>
+      */}
 
       <section id="about-project" className="home-section about-project-section">
         <div className="about-project-copy">
